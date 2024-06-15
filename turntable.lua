@@ -11,18 +11,10 @@ function init_params()
     if x == 2 then tt.rpm = 45 end
     if x == 3 then tt.rpm = 78 end
   end)
-  speedControl = controlspec.def{
-    min = 0.75, -- the minimum value
-    max = 1.5, -- the maximum value
-    warp = 'exp', -- a shaping option for the raw value
-    step = 0.01, -- output value quantization
-    default = 1, -- default value
-    units = 'x', -- displayed on PARAMS UI
-    quantum = 0.01, -- each delta will change raw value by this much
-    wrap = false -- wrap around on overflow (true) or clamp (false)
-  }
-
-  params:add_control('speed', 'Turntable Speed', speedControl)
+  
+  ctrlSpeed = controlspec.def{min = 0.625, max = 1.6, warp = 'exp', step = 0.01, default = 1, units = 'x', quantum = 0.01, wrap = false}
+  
+  params:add_control('speed', 'Turntable Speed', ctrlSpeed)
   params:set_action('speed', function(x) tt.faderRate = x end)
   
 
@@ -54,7 +46,7 @@ function init()
   rpmOptions = { "33 1/3", "45", "78" }
   tt = {}
   tt.position = 270
-  tt.faderRate = 1
+  --tt.faderRate = 1
   tt.rpm = 33.3
   tt.playRate = 0.
   tt.destinationRate = 0.
@@ -185,6 +177,7 @@ function drawBackground()
   screen.fill()
   --platter
   screen.circle(32,32,30)
+  screen.circle(32,32,2)
   --tone arm
   screen.level(5)
   screen.move(74,5)
@@ -195,6 +188,7 @@ function drawBackground()
   screen.aa(0)
   -- speed fader
   screen.rect(125,3, -10, 59)
+  screen.pixel(114,32)
   screen.stroke()
 end
 
@@ -203,13 +197,12 @@ function drawSegments()
   --turntable
   screen.aa(1)
   screen.level(0)
-  screen.arc(32, 32, 25, nowRad, nowRad + math.rad(360/48))
+  screen.arc(32, 32, 29, nowRad, nowRad + math.rad(360/48))
   screen.line(30,30)
   screen.fill()
   --speed fader
   screen.aa(0)
-  --NewValue = (((OldValue - OldMin) * (NewMax - NewMin)) / (OldMax - OldMin)) + NewMin
-  screen.rect(124, (((tt.faderRate - 0.75) * (125 - 4)) / (2 - 0.75)) + 4, -9, 4)
+  screen.rect(124, ctrlSpeed:unmap(params:get('speed')) * 54 + 3, -9, 4)
   screen.fill()
   -- clock
   clockCounter = clockCounter - 1
@@ -292,7 +285,7 @@ function play_clock()
   while true do
     clock.sleep(1/15) --60 ticks per second
     if playing or tt.playRate > 0.001 then
-      tt.playRate = tt.playRate + ((params:get('speed') - tt.playRate) * tt.inertia / 2)
+      tt.playRate = tt.playRate + ((params:get('speed') * tt.destinationRate - tt.playRate) * tt.inertia / 2)
       tt.position = tt.position + tt.playRate * (360 / ((60 / tt.rpm) * 15))
       screen.dirty = true
     else tt.playRate = 0 end
