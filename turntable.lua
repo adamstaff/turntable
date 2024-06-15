@@ -62,29 +62,25 @@ function init()
   
   softcut.event_render(copy_samples)
   waveform = {}
-  waveform.isLoaded = {false, false, false, false, false, false, false, false}
+  waveform.isLoaded = false
   waveform.samples = {}
-  waveform.channels = {}
-  waveform.length = {}
-  waveform.rate = {}
   
   --add samples
-  file = {}
+--  file = {}
   
   -- clear buffer
   softcut.buffer_clear()
   for i=1, 2, 1 do
     -- enable voices
     softcut.enable(i,1)
-    -- set voices to buffer 1
-    softcut.buffer(i,1)
+    -- set voices to buffers
+    softcut.buffer(i,i)
     -- set voices level to 1.0
     softcut.level(i,1.0)
     softcut.level_slew_time(i,0.5)
-    softcut.pan(i,0)
-    -- voices disable loop
+    -- voices enable loop
     softcut.loop(i,1)
-    softcut.loop_start(i,i)
+    softcut.loop_start(i,0)
     softcut.loop_end(i,10)
     softcut.position(i,0)
     -- set voices rate to 1.0 and no fade
@@ -93,12 +89,14 @@ function init()
     -- disable voices play
     softcut.play(i,0)
   end
+  softcut.pan(1,-1)
+  softcut.pan(2,1)
 
   --weIniting = false
   screenDirty = true
   
   --temp load a file
-  softcut.buffer_read_stereo(_path.audio..'/Dynamite Remix/130 House Kick Loop 022 bpm120.wav', 0, 0, -1, 0, 1)
+  softcut.buffer_read_stereo(_path.audio..'/Empathy Stems/Your Energy (127bpm)/Anew Colour - Your Energy Stems (MUSIC).wav', 0, 0, -1, 0, 1)
 
 end
 
@@ -107,17 +105,17 @@ function newDestinationRate()
 end
 
 function copy_samples(ch, start, length, samples)
-  --start = math.floor(start)
-  for i = 1, samples, 1 do
+  for i = 1, 128, 1 do
     waveform.samples[i] = samples[i]
   end
+  print("finished loading waveform")
   screenDirty = true
-  waveform.isLoaded[start] = true
+  waveform.isLoaded = true
 end
 
 -- draw waveform
-function redraw_sample()
-  softcut.render_buffer(1, 0, 10, 256)
+function redraw_sample(length)
+  softcut.render_buffer(1, 0, length, 128)
 end
 
 function load_file(file)
@@ -127,68 +125,77 @@ function load_file(file)
     local ch, length, rate = audio.file_info(file)
     --get length and limit to 1s
     local lengthInS = length * (1 / rate)
-    print("sample length is "..lengthInS)
-    --if lengthInS > 1 then lengthInS = 1 end
-    --if waveform then
-    --  waveform.length[track-1] = lengthInS
-    --end
-    -- erase section of buffer -- required?
-    --softcut.buffer_clear_region(track, 1, 0, 0)
+    print("sample length is "..length)
+    print("channels is "..ch)
+    print("sample rate is "..rate)
     --load file into buffer (file, start_source, start_destination, duration, preserve, mix)
     softcut.buffer_read_stereo(file, 0, 0, -1, 0, 1)
     --read samples into waveformSamples (channel)
-    --redraw_sample()
+    redraw_sample(length)
     --set start/end play positions
-    --softcut.loop_start(1,track + params:get('sampStart_'..track))
-    softcut.loop_end(1, lengthInS)
+    for i=1, 2, 1 do
+      softcut.loop_start(i,0)
+      softcut.loop_end(i, lengthInS)
+    end
     --update param
     --params:set("sample_"..track,file,0)
   end
   weLoading = false
-end
-
---function play(track, level)
---  if not level then level = 1.0 end
-	-- put the playhead in position (voice, position)
---	softcut.position(track, track + params:get('sampStart_'.. track))
-  --set dynamic level
---  softcut.level(track, level * 10^(params:get('trackVolume_'..track) / 20))
-	-- play from position to softcut.loop_end
---  softcut.play(track, 1)
---end
-
-function drawIntro()
-  if introCounter > 0 then
-    introCounter = introCounter - 2
-    screen.clear()
-    drawBackground()
-    if introCounter % (2 * 15) > 15 then
-      drawSegmentsAll()
-      drawClock("00:00")
-    end
-  else weIniting = false end
+  heldKeys[1] = false
 end
 
 function drawBackground()
   screen.aa(1)
   --background
   screen.level(1)
-  screen.rect(0,0,127,64)
+  screen.rect(0,0,80,64)
+  screen.fill()
+  --record
+  screen.level(0)
+  screen.circle(32,32,29)
+  screen.fill()
+  screen.level(10)
+  screen.circle(32,32,10)
+  screen.fill()
+  screen.level(1)
+  screen.circle(32,32,3)
   screen.fill()
   --platter
-  screen.circle(32,32,30)
-  screen.circle(32,32,2)
-  --tone arm
   screen.level(5)
-  screen.move(74,5)
-  screen.line(68,30)
-  screen.line(50, 50)
-  screen.line(54, 42)
+  screen.circle(32,32,2)
+  screen.stroke()
+  screen.circle(32,32,30)
+  --accessories
+  screen.rect(3,61,7,-4)
+  screen.rect(13,60,3,1)
+  screen.stroke()
+  screen.level(6)
+  screen.circle(4,52,2)
+  screen.fill()
+  screen.level(0)
+  screen.circle(68, 12, 8)
+  screen.fill()
+  screen.level(3)
+  screen.circle(68, 12, 6)
+  screen.fill()
+  --tone arm
+  screen.level(8)
+  screen.move(68,12)
+  screen.line(59, 30)
+  screen.line(57, 40)
+  screen.line(48, 50)
+  screen.line(50, 46)
   screen.stroke()
   screen.aa(0)
   -- speed fader
-  screen.rect(125,3, -10, 59)
-  screen.pixel(114,32)
+  screen.level(4)
+  screen.rect(75,62, -8, -35)
+  screen.stroke()
+  screen.level(2)
+  screen.rect(74,61, -6, -33)
+  screen.fill()
+  screen.level(8)
+  screen.pixel(74,44)
   screen.stroke()
 end
 
@@ -196,14 +203,23 @@ function drawSegments()
   local nowRad = math.rad(util.round(tt.position, 360/24))
   --turntable
   screen.aa(1)
-  screen.level(0)
-  screen.arc(32, 32, 29, nowRad, nowRad + math.rad(360/48))
+  screen.level(3)
+  screen.arc(32, 32, 29, nowRad, nowRad + 1/3/14)
   screen.line(30,30)
   screen.fill()
+  --grooves
+  screen.level(2)
+  screen.arc(32,32, 25, 5.2, 5.4)
+  screen.stroke()
+  screen.arc(32,32, 25, 2, 3,5)
+  screen.stroke()
   --speed fader
   screen.aa(0)
-  screen.rect(124, ctrlSpeed:unmap(params:get('speed')) * 54 + 3, -9, 4)
+  screen.level(0)
+  screen.rect(74, 27 + ctrlSpeed:unmap(params:get('speed')) * 30, -7, 4)
   screen.fill()
+  screen.level(15)
+  screen.text_rotate(73, 60, params:get'speed', 270)
   -- clock
   clockCounter = clockCounter - 1
   if clockCounter < 1 then
@@ -212,9 +228,6 @@ function drawSegments()
     osdate = osdate:sub(12,16)
   end  
   drawClock(osdate)
-  --rate
-  screen.move(80, 63)
-  screen.text(tt.playRate)
 end
 
 function drawSegmentsAll()
@@ -235,36 +248,33 @@ function drawSegmentsAll()
 end
 
 function drawClock(x)
-  screen.move(1,6)
-  screen.text(x)
+  screen.move(75,6)
+  screen.text_right(x)
   screen.fill()
 end
 
 function drawWaveform()
 	--waveform
---[[	screen.level(15)
-	if waveform.isLoaded[currentTrack] then
-  	for i=1, editArea.width, 1 do
-  	  screen.move(i+editArea.border, editArea.border  + editArea.height * 0.5 + waveform.samples[(currentTrack) * editArea.width + i] * editArea.height * 0.5)
-	    screen.line(i+editArea.border, editArea.border  + editArea.height * 0.5 + waveform.samples[(currentTrack) * editArea.width + i] * editArea.height * -0.5)
+	screen.level(8)
+	if waveform.isLoaded then
+    for i=1, 128, 1 do
+      screen.move(100 + waveform.samples[i] * 20, 64-i)
+	    screen.line(100 - waveform.samples[i] * 20, 64-i)
 	    screen.stroke()
-  	end
+    end
 	else
-	   screen.move(64,34)
-	   screen.text_center("K3 to load sample")
+	  screen.move(64,34)
+	  screen.text_center("K1+K3 to load sample")
 	end
-	screen.fill()]]--
+	screen.fill()
 end
 
 function redraw()
-  if weIniting then
-    drawIntro()
-  else
-    if not weLoading then
+  screen.clear()
+  if not weLoading then
     drawBackground()
     drawSegments()
     drawWaveform()
-    end
   end
 
   screen.update()
@@ -284,12 +294,13 @@ end
 function play_clock()
   while true do
     clock.sleep(1/15) --60 ticks per second
-    if playing or tt.playRate > 0.001 then
+    if playing or (tt.playRate > 0.001 or tt.playRate < -0.001) then
       tt.playRate = tt.playRate + ((params:get('speed') * tt.destinationRate - tt.playRate) * tt.inertia / 2)
       tt.position = tt.position + tt.playRate * (360 / ((60 / tt.rpm) * 15))
       screen.dirty = true
     else tt.playRate = 0 end
     softcut.rate(1,tt.playRate)
+    softcut.rate(2,tt.playRate)
   end
 end
 
@@ -314,7 +325,8 @@ function enc(e, d)
     end
     
     if (e == 2) then
-    
+      --softcut.set_position(1, softcut.query_position(1) + d/10)
+      print(softcut.query_position(1))
     end
     
     if (e == 3) then
@@ -325,13 +337,15 @@ end
 
 function key(k, z)
   
+  
+  
   heldKeys[k] = z == 1
 
   -- load sample
---[[	if sampleView and k == 3 and z == 0 and not heldKeys[1] then
+  if (k == 3 and z ==0 and heldKeys[1]) then
 	  weLoading = true
 		fileselect.enter(_path.audio,load_file)
-	end ]]--
+	end
 	
   if z == 0 then
     if k == 1 then
@@ -340,13 +354,15 @@ function key(k, z)
     if k == 2 then
 
     end
-    if k == 3 then
+    if k == 3 and not heldKeys[1] and not weLoading then
       if playing then
         playing = false
         tt.destinationRate = 0
       else
         playing = true
+        softcut.voice_sync(2,1,0)
         softcut.play(1,1)
+        softcut.play(2,1)
         tt.destinationRate = 1
       end
     end
