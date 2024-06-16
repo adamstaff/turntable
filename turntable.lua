@@ -71,9 +71,7 @@ function init()
   waveform.samples = {}
   waveform.rate = 44100
   waveform.position = 0
-  
-  --add samples
---  file = {}
+  waveform.length = 0
   
   -- clear buffer
   softcut.buffer_clear()
@@ -140,6 +138,7 @@ function load_file(file)
     print("sample length is "..length)
     print("sample rate is "..rate)
     waveform.rate = rate
+    waveform.length = length
     --load file into buffer (file, start_source (s), start_destination (s), duration (s), preserve, mix)
     softcut.buffer_read_stereo(file, 0, 0, -1, 0, 1)
     --read samples into waveformSamples (number of samples)
@@ -251,6 +250,12 @@ function drawBackground()
     osdate = osdate:sub(12,16)
   end  
   drawClock(osdate)
+  --time elapsed / remaining
+  screen.move(128,64)
+  screen.text_right(util.s_to_hms(math.floor(((waveform.position * 1024) / waveform.length) * (waveform.length / waveform.rate))))
+  screen.move(128,8)
+  screen.text_right("x")
+  screen.fill()
 end
 
 function drawSegmentsAll()
