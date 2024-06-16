@@ -17,6 +17,7 @@ function init_params()
   params:add_control('speed', 'Turntable Speed', ctrlSpeed)
   params:set_action('speed', function(x) tt.faderRate = x end)
   
+  params:add_text('file', 'File: ', "")
 
   -- here, we set our PSET callbacks for save / load:
   params.action_write = function(filename,name,number)
@@ -61,9 +62,11 @@ function init()
   heldKeys = {}
   
   softcut.event_render(copy_samples)
+  softcut.event_position(get_position)
   waveform = {}
   waveform.isLoaded = false
   waveform.samples = {}
+  waveform.rate = 44100
   
   --add samples
 --  file = {}
@@ -100,17 +103,19 @@ function init()
 
 end
 
-function newDestinationRate()
-  
-end
-
 function copy_samples(ch, start, length, samples)
-  for i = 1, 128, 1 do
+	print("loading "..#samples.." samples")
+  for i = 1, #samples, 1 do
     waveform.samples[i] = samples[i]
   end
   print("finished loading waveform")
   screenDirty = true
   waveform.isLoaded = true
+end
+
+function get_position(p)
+	print("position is "..p.." seconds")
+	return p * waveform.rate / 4
 end
 
 -- draw waveform
@@ -120,25 +125,24 @@ end
 
 function load_file(file)
   if file and file ~= "cancel" then
-    --if not track then track = currentTrack end
     --get file info
     local ch, length, rate = audio.file_info(file)
-    --get length and limit to 1s
+    --calc length in seconds
     local lengthInS = length * (1 / rate)
     print("sample length is "..length)
-    print("channels is "..ch)
     print("sample rate is "..rate)
-    --load file into buffer (file, start_source, start_destination, duration, preserve, mix)
+    waveform.rate = rate
+    --load file into buffer (file, start_source (s), start_destination (s), duration (s), preserve, mix)
     softcut.buffer_read_stereo(file, 0, 0, -1, 0, 1)
-    --read samples into waveformSamples (channel)
-    redraw_sample(length)
-    --set start/end play positions
+    --read samples into waveformSamples (number of samples)
+    redraw_sample(math.floor(length / 4))
+    --set start/end loop positions
     for i=1, 2, 1 do
       softcut.loop_start(i,0)
       softcut.loop_end(i, lengthInS)
     end
     --update param
-    --params:set("sample_"..track,file,0)
+    params:set("file",file,0)
   end
   weLoading = false
   heldKeys[1] = false
@@ -257,24 +261,33 @@ function drawWaveform()
 	--waveform
 	screen.level(8)
 	if waveform.isLoaded then
-    for i=1, 128, 1 do
-      screen.move(100 + waveform.samples[i] * 20, 64-i)
-	    screen.line(100 - waveform.samples[i] * 20, 64-i)
+    for i=1, 64, 1 do
+    	local width = 20
+    	local x = 100
+      local offset = 0
+    	local playhead = softcut.query_position(1) + i + offset
+    	local sammple = waveform.samples[playhead]
+      screen.move(x + sample * width, 64-i)
+	    screen.line(x - sample * width, 64-i)
 	    screen.stroke()
     end
 	else
-	  screen.move(64,34)
-	  screen.text_center("K1+K3 to load sample")
+	  screen.move(100,30)
+	  screen.text_center("K1+K3 to")
+	  screen.move(100,38)
+	  screen.text_center("load sample")
 	end
 	screen.fill()
 end
 
 function redraw()
-  screen.clear()
   if not weLoading then
-    drawBackground()
-    drawSegments()
-    drawWaveform()
+  	if screenDirty or tt.playRate > 0.001 or tt.playRate < 0.001 then
+			screen.clear()
+			drawBackground()
+			drawSegments()
+			drawWaveform()
+		end
   end
 
   screen.update()
@@ -320,16 +333,15 @@ function enc(e, d)
   else
     paused = false
   --Not Shifting
-    if (e == 1) then
+    if (e == 3) then
       tt.playRate = tt.playRate + d * 1/100
     end
     
     if (e == 2) then
-      --softcut.set_position(1, softcut.query_position(1) + d/10)
-      print(softcut.query_position(1))
+      tt.playRate = tt.playRate + d * 1/3
     end
     
-    if (e == 3) then
+    if (e == 1) then
       params:delta('speed', d)
     end
   end
