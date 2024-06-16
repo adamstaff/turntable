@@ -52,6 +52,7 @@ function init()
   tt.playRate = 0.
   tt.destinationRate = 0.
   tt.inertia = 0.3
+  tt.position = 0
 
   init_params()
 
@@ -62,11 +63,13 @@ function init()
   heldKeys = {}
   
   softcut.event_render(copy_samples)
-  softcut.event_position(get_position)
+  softcut.event_phase(get_position)
+  
   waveform = {}
   waveform.isLoaded = false
   waveform.samples = {}
   waveform.rate = 44100
+  waveform.position = 0
   
   --add samples
 --  file = {}
@@ -94,6 +97,7 @@ function init()
   end
   softcut.pan(1,-1)
   softcut.pan(2,1)
+  softcut.phase_quant(1, 0.25)
 
   --weIniting = false
   screenDirty = true
@@ -101,6 +105,7 @@ function init()
   --temp load a file
   softcut.buffer_read_stereo(_path.audio..'/Empathy Stems/Your Energy (127bpm)/Anew Colour - Your Energy Stems (MUSIC).wav', 0, 0, -1, 0, 1)
 
+  softcut.poll_start_phase(1)
 end
 
 function copy_samples(ch, start, length, samples)
@@ -113,17 +118,21 @@ function copy_samples(ch, start, length, samples)
   waveform.isLoaded = true
 end
 
-function get_position(p)
-	print("position is "..p.." seconds")
-	return p * waveform.rate / 4
+function get_position(pos)
+	waveform.position = math.floor(pos * waveform.rate / 32)
 end
 
 -- draw waveform
-function redraw_sample(length)
-  softcut.render_buffer(1, 0, length, 128)
+function redraw_sample(seconds, samples)
+  print("calling the render function")
+  samples = math.floor(samples / 32)
+  print("amount of time is "..seconds)
+  print("number of samples is "..samples)
+  softcut.render_buffer(1, 0, seconds, samples)
 end
 
 function load_file(file)
+  print('loading file '..file)
   if file and file ~= "cancel" then
     --get file info
     local ch, length, rate = audio.file_info(file)
@@ -135,7 +144,7 @@ function load_file(file)
     --load file into buffer (file, start_source (s), start_destination (s), duration (s), preserve, mix)
     softcut.buffer_read_stereo(file, 0, 0, -1, 0, 1)
     --read samples into waveformSamples (number of samples)
-    redraw_sample(math.floor(length / 4))
+    redraw_sample(lengthInS, length)
     --set start/end loop positions
     for i=1, 2, 1 do
       softcut.loop_start(i,0)
@@ -265,17 +274,18 @@ function drawWaveform()
     	local width = 20
     	local x = 100
       local offset = 0
-    	local playhead = softcut.query_position(1) + i + offset
-    	local sammple = waveform.samples[playhead]
+    	local playhead = waveform.position + i + offset
+    	if playhead > #waveform.samples - 1 then playhead = playhead - #waveform.samples end
+    	local sample = waveform.samples[playhead]
       screen.move(x + sample * width, 64-i)
 	    screen.line(x - sample * width, 64-i)
 	    screen.stroke()
     end
 	else
-	  screen.move(100,30)
+	  screen.move(110,30)
 	  screen.text_center("K1+K3 to")
-	  screen.move(100,38)
-	  screen.text_center("load sample")
+	  screen.move(110,38)
+	  screen.text_center("load file")
 	end
 	screen.fill()
 end
