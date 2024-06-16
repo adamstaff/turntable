@@ -40,6 +40,7 @@ function init()
   clockCounter = 60
   osdate = os.date()
   osdate = osdate:sub(12,16)
+  jitter = 0
 
   redraw_clock_id = clock.run(redraw_clock)
   play_clock_id = clock.run(play_clock)
@@ -100,13 +101,13 @@ function init()
 
   --weIniting = false
   screenDirty = true
+
+  softcut.poll_start_phase(1)
+  softcut.phase_quant(1, 1/60)
   
   --temp load a file
   load_file(_path.audio..'/Empathy Stems/Your Energy (127bpm)/Anew Colour - Your Energy Stems (MUSIC).wav', 0, 0, -1, 0, 1)
   waveform.isLoaded = true
-
-  softcut.poll_start_phase(1)
-  softcut.phase_quant(1, 1/60)
 end
 
 function copy_samples(ch, start, length, samples)
@@ -120,12 +121,12 @@ function copy_samples(ch, start, length, samples)
 end
 
 function get_position(x, pos)
-	waveform.position = pos * waveform.rate / 512
+	waveform.position = pos * waveform.rate / 1024
 end
 
--- draw waveform
 function redraw_sample(seconds, samples)
-  samples = math.floor(samples / 512)
+  print("copying samples")
+  samples = math.floor(samples / 1024)
   softcut.render_buffer(1, 0, seconds, samples)
 end
 
@@ -161,10 +162,8 @@ function drawBackground()
   screen.level(1)
   screen.rect(0,0,80,64)
   screen.fill()
-  --record
-  screen.level(0)
-  screen.circle(32,32,29)
-  screen.fill()
+  --
+  screen.aa(1)
   screen.level(10)
   screen.circle(32,32,10)
   screen.fill()
@@ -175,8 +174,36 @@ function drawBackground()
   screen.level(5)
   screen.circle(32,32,2)
   screen.stroke()
-  screen.circle(32,32,30)
+  screen.circle(32,32,30)  
+    --record
+  screen.level(0)
+  screen.circle(32,32,29)
+  screen.fill()
+  screen.level(8)
+  screen.circle(32,32,10)
+  screen.fill()
+  screen.level(1)
+  screen.circle(32,32,1)
+  screen.fill()
+  --[[turntable
+  local nowRad = math.rad(tt.position)
+  screen.aa(1)
+  screen.level(5)
+  screen.arc(32, 32, 29, nowRad, nowRad + 1/3/14)
+  screen.line(30,30)
+  screen.fill()--]]
+  --grooves
+  screen.level(1)
+  if tt.destinationRate == 1 then
+    jitter = util.clamp(jitter + math.random(3)/25 - 0.06, -0.05,0.05)
+  end
+  screen.level(2)
+  screen.arc(32,32, 25, 5.2 + jitter, 5.4 + jitter)
+  screen.stroke()
+  screen.arc(32,32, 25, 2 + jitter, 3.5 + jitter)
+  screen.stroke()
   --accessories
+  screen.level(5)
   screen.rect(3,61,7,-4)
   screen.rect(13,60,3,1)
   screen.stroke()
@@ -198,7 +225,7 @@ function drawBackground()
   screen.line(50, 46)
   screen.stroke()
   screen.aa(0)
-  -- speed fader
+  -- speed fader base
   screen.level(4)
   screen.rect(75,62, -8, -35)
   screen.stroke()
@@ -208,22 +235,6 @@ function drawBackground()
   screen.level(8)
   screen.pixel(74,44)
   screen.stroke()
-end
-
-function drawSegments()
-  local nowRad = math.rad(util.round(tt.position, 360/24))
-  --turntable
-  screen.aa(1)
-  screen.level(3)
-  screen.arc(32, 32, 29, nowRad, nowRad + 1/3/14)
-  screen.line(30,30)
-  screen.fill()
-  --grooves
-  screen.level(2)
-  screen.arc(32,32, 25, 5.2, 5.4)
-  screen.stroke()
-  screen.arc(32,32, 25, 2, 3,5)
-  screen.stroke()
   --speed fader
   screen.aa(0)
   screen.level(0)
@@ -231,6 +242,7 @@ function drawSegments()
   screen.fill()
   screen.level(15)
   screen.text_rotate(73, 60, params:get'speed', 270)
+  screen.fill()
   -- clock
   clockCounter = clockCounter - 1
   if clockCounter < 1 then
@@ -266,12 +278,16 @@ end
 
 function drawWaveform()
 	--waveform
+	screen.level(3)
+	screen.move(80,48)
+	screen.line(128,48)
+	screen.stroke()
 	screen.level(8)
 	if waveform.isLoaded then
     for i=1, 64, 1 do
-    	local width = 20
-    	local x = 100
-      local offset = 0
+    	local width = 24
+    	local x = 104
+      local offset = -16
     	local playhead = math.floor(waveform.position) + i + offset
     	if playhead >= #waveform.samples then playhead = playhead - #waveform.samples end
     	if playhead < 1 then playhead = playhead + #waveform.samples end
@@ -296,7 +312,6 @@ function redraw()
   	if screenDirty or tt.playRate > 0.001 or tt.playRate < 0.001 then
 			screen.clear()
 			drawBackground()
-			drawSegments()
 			drawWaveform()
 		end
   end
@@ -317,9 +332,9 @@ end
 
 function play_clock()
   while true do
-    clock.sleep(1/15) --60 ticks per second
+    clock.sleep(1/240)
     if playing or (tt.playRate > 0.001 or tt.playRate < -0.001) then
-      tt.playRate = tt.playRate + ((params:get('speed') * tt.destinationRate - tt.playRate) * tt.inertia / 2)
+      tt.playRate = tt.playRate + ((params:get('speed') * tt.destinationRate - tt.playRate) * tt.inertia / (120/15))
       tt.position = tt.position + tt.playRate * (360 / ((60 / tt.rpm) * 15))
       screen.dirty = true
     else tt.playRate = 0 end
@@ -356,6 +371,7 @@ function enc(e, d)
       params:delta('speed', d)
     end
   end
+  screenDirty = true
 end
 
 function key(k, z)
@@ -374,9 +390,6 @@ function key(k, z)
     if k == 1 then
       
     end
-    if k == 2 then
-
-    end
     if k == 3 and not heldKeys[1] and not weLoading then
       if playing then
         playing = false
@@ -390,6 +403,17 @@ function key(k, z)
       end
     end
   end
+  
+  if k == 2 then
+    if z == 1 then
+      tt.destinationRate = 0
+      tt.inertia = 0.7
+    else 
+      tt.destinationRate = 1
+      tt.inertia = 0.3
+    end
+  end
+  screenDirty = true
 end
 
 function cleanup() --------------- cleanup() is automatically called on script close
