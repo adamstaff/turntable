@@ -16,13 +16,23 @@ function init_params()
   params:add_binary('warningOn', 'Warning Timer', 'toggle', 1)
   params:add_number('warning', "Warning Length", 1, 60, 10)
 
-  params:add_option('rpm', 'record rpm', rpmOptions, 1)
-  params:set_action('rpm', function(x)
+  params:add_option('prpm', 'player rpm', rpmOptions, 1)
+  params:set_action('prpm', function(x)
     if x == 1 then tt.rpm = 100/3 end
     if x == 2 then tt.rpm = 45 end
     if x == 3 then tt.rpm = 78 end
   end)
-  
+
+  params:add_option('rrpm', 'record rpm', rpmOptions, 1)
+  params:set_action('rrpm', function(x)
+    if x == 1 then tt.recordSpeed = 100/3
+tt.recordSize = 27 end
+    if x == 2 then tt.recordSpeed = 45
+tt.recordSize = 27 end
+    if x == 3 then tt.recordSize = 16
+tt.recordSpeed = 78 end
+  end)
+
   ctrlSpeed = controlspec.def{min = 0.625, max = 1.6, warp = 'exp', step = 0.01, default = 1, units = 'x', quantum = 0.01, wrap = false}
   
   params:add_control('speed', 'Turntable Speed', ctrlSpeed)
@@ -63,6 +73,8 @@ function init()
   tt = {}
   --tt.faderRate = 1
   tt.rpm = 33.3
+tt.recordSize = 27
+tt.recordSpeed = 33.33
   tt.playRate = 0.
   tt.destinationRate = 0.
   tt.nudgeRate = 0.
@@ -197,7 +209,7 @@ function drawBackground()
   screen.fill()
     --record
   screen.level(0)
-  screen.circle(32,32,27) --vinyl
+  screen.circle(32,32,tt.recordSize) --vinyl
   screen.fill()
   screen.level(15)
   screen.circle(32,32,10) --sticker
