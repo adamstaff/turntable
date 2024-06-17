@@ -12,6 +12,9 @@ function init_params()
       softcut.loop(i,x)
     end
   end)
+  
+  params:add_binary('warningOn', 'Warning Timer', 'toggle', 1)
+  params:add_number('warning', "Warning Length", 1, 60, 10)
 
   params:add_option('rpm', 'record rpm', rpmOptions, 1)
   params:set_action('rpm', function(x)
@@ -49,6 +52,9 @@ function init()
   osdate = os.date()
   osdate = osdate:sub(12,16)
   jitter = 0
+  
+  norns.enc.sens(2,1)
+  norns.enc.accel(2,-2)
 
   redraw_clock_id = clock.run(redraw_clock)
   play_clock_id = clock.run(play_clock)
@@ -129,6 +135,7 @@ function copy_samples(ch, start, length, samples)
 end
 
 function get_position(x, pos)
+  pos = pos * (48000 / waveform.rate)
 	waveform.position = pos * waveform.rate / 1024
 	if params:get('loop') == 0 and pos > ((waveform.length - 1000) / waveform.rate) then
 	  print("hit end of file")
@@ -153,8 +160,8 @@ function load_file(file)
     --get file info
     local ch, length, rate = audio.file_info(file)
     --calc length in seconds
-    local lengthInS = length * (1 / rate)
-    print("sample length is "..length)
+    local lengthInS = length * ((rate / 48000) / rate)
+    print("sample length is "..lengthInS)
     print("sample rate is "..rate)
     waveform.rate = rate
     waveform.length = length
@@ -181,14 +188,14 @@ function drawBackground()
   screen.rect(0,0,80,64)
   screen.fill()
   --platter
- screen.level(3)
+ screen.level(5)
   screen.circle(32,32,30)  
   screen.fill()
     --record
   screen.level(0)
   screen.circle(32,32,27) --vinyl
   screen.fill()
-  screen.level(8)
+  screen.level(15)
   screen.circle(32,32,10) --sticker
   screen.fill()
   screen.level(0)
@@ -243,14 +250,14 @@ function drawBackground()
   screen.circle(4,51,3) -- turny thing
   screen.fill()
   if playing then -- play light
-    screen.level(6)
+    screen.level(10)
     screen.arc(4,51,3, 5.3,6.2)
     screen.arc(4,51,7, 5.3,6.2)
     screen.fill()
   end
   --tone arm
   screen.line_width(2)
-  screen.level(10)
+  screen.level(15)
   screen.move(69,11)
   local pro = 0
   if waveform.isLoaded then
@@ -272,7 +279,7 @@ function drawBackground()
   screen.stroke()]]--
   screen.line_width(1)
   -- speed fader base
-  screen.level(4)
+  screen.level(5)
   screen.rect(75,62, -8, -35)
   screen.stroke()
   screen.level(2)
@@ -294,7 +301,7 @@ function drawBackground()
     if pausedHand < 0 then pausedHand = 0 end
   end
   if not heldKeys[2] and pausedHand < 15 then pausedHand = pausedHand + 3 end
-  screen.level(5)
+  screen.level(8)
   screen.circle(35, pausedHand + 60, 8)
   screen.fill()
 
@@ -343,6 +350,11 @@ function drawSegmentsAll()
 end
 
 function drawWaveform()
+  --warning!!
+  if params:get('loop') == 0 and params:get('warningOn') == 1 and math.floor((((waveform.length - waveform.position * 1024)) / waveform.length) * (waveform.length / waveform.rate)) < params:get('warning') and clockCounter < 15 then
+    screen.rect(80,0,48,64)
+    screen.fill()
+  end
 	--waveform
 	screen.aa(0)
 	--waveform proper
@@ -356,7 +368,7 @@ function drawWaveform()
     	if playhead < 1 then playhead = playhead + #waveform.samples end
     	local sample = waveform.samples[playhead]
     	if sample then
-    	  screen.level(math.floor(1 + math.abs(sample) * 8))
+    	  screen.level(math.floor(1 + math.abs(sample) * 15))
         screen.move(x + sample * width, 64-i)
   	    screen.line(x - sample * width, 64-i)
   	    screen.stroke()
@@ -365,7 +377,7 @@ function drawWaveform()
   	screen.level(3)
 	  for i=80, 128, 1 do
 	    if i % 8 == 0 then 
-	      screen.pixel(i + 4,48)
+	      screen.pixel(i + 4,47)
 	    end
 	  end
 	else
@@ -384,6 +396,7 @@ function redraw()
 			drawWaveform()
 			drawUI()
 			screen.fill()
+			tt.position = tt.position + tt.playRate * (360 / ((60 / tt.rpm) * 15))
 		end
   end
 
@@ -393,7 +406,7 @@ end
 
 function redraw_clock() ----- a clock that draws space
   while true do ------------- "while true do" means "do this forever"
-    clock.sleep(1/15) ------- pause for a fifteenth of a second (aka 15fps)
+    clock.sleep(1/60) ------- pause for a fifteenth of a second (aka 15fps)
     if (screenDirty or playing) and not weLoading then ---- only if something changed
       redraw() -------------- redraw space
       screen_dirty = false -- and everything is clean again
@@ -405,11 +418,7 @@ end
 function play_clock()
   while true do
     clock.sleep(1/240)
-    --if playing or (tt.playRate > 0.001 or tt.playRate < -0.001) then
-      tt.playRate = tt.playRate + ((params:get('speed') * (tt.nudgeRate + tt.destinationRate) - tt.playRate) * tt.inertia / (120/15))
-      tt.position = tt.position + tt.playRate * (360 / ((60 / tt.rpm) * 15))
-      screen.dirty = true
-    --else tt.playRate = 0 end
+    tt.playRate = tt.playRate + ((params:get('speed') * (tt.nudgeRate + tt.destinationRate) - tt.playRate) * tt.inertia / (120/15))
     softcut.rate(1,tt.playRate)
     softcut.rate(2,tt.playRate)
   end
@@ -432,11 +441,11 @@ function enc(e, d)
     paused = false
   --Not Shifting
     if (e == 3) then
-      --tt.nudgeRate = d / 10
+      tt.nudgeRate = d / 10
     end
     
     if (e == 2) then
-      --tt.nudgeRate = d * 5
+      tt.nudgeRate = d * 2
     end
     
     if (e == 1) then
@@ -460,7 +469,13 @@ function key(k, z)
     if k == 1 then
       
     end
-    if k == 3 and not heldKeys[1] and not weLoading then --PLAY/STOP
+  end
+
+  if k == 3 then
+    if z == 1 and heldKeys[2] then --WHEEEEEL UPPPP
+      tt.nudgeRate = -60
+    end
+    if z == 1 and not heldKeys[1] and not heldKeys[2] and not weLoading then --PLAY/STOP
       if playing then
         playing = false
         tt.destinationRate = 0
@@ -472,11 +487,6 @@ function key(k, z)
         tt.destinationRate = 1
       end
     end
-  end
-
-  if k == 3 and z == 1 and heldKeys[2] then --WHEEEEEL UPPPP
-    tt.nudgeRate = -20
-    tt.inertia = 0.8
   end
 
   
