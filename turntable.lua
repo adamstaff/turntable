@@ -71,7 +71,7 @@ function init()
   waveform.samples = {}
   waveform.rate = 44100
   waveform.position = 0
-  waveform.length = 0
+  waveform.length = false
   
   -- clear buffer
   softcut.buffer_clear()
@@ -104,7 +104,7 @@ function init()
   softcut.phase_quant(1, 1/60)
   
   --temp load a file
-  load_file(_path.audio..'/Empathy Stems/Your Energy (127bpm)/Anew Colour - Your Energy Stems (MUSIC).wav', 0, 0, -1, 0, 1)
+  load_file(_path.audio..'/Breaks/Adrift Break.wav', 0, 0, -1, 0, 1)
   waveform.isLoaded = true
 end
 
@@ -161,28 +161,19 @@ function drawBackground()
   screen.level(1)
   screen.rect(0,0,80,64)
   screen.fill()
-  --
-  screen.aa(1)
-  screen.level(10)
-  screen.circle(32,32,10)
-  screen.fill()
-  screen.level(1)
-  screen.circle(32,32,3)
-  screen.fill()
   --platter
-  screen.level(5)
-  screen.circle(32,32,2)
-  screen.stroke()
+ screen.level(3)
   screen.circle(32,32,30)  
+  screen.fill()
     --record
   screen.level(0)
-  screen.circle(32,32,29)
+  screen.circle(32,32,27) --vinyl
   screen.fill()
   screen.level(8)
-  screen.circle(32,32,10)
+  screen.circle(32,32,10) --sticker
   screen.fill()
   screen.level(1)
-  screen.circle(32,32,1)
+  screen.circle(32,32,1) --spindle
   screen.fill()
   --[[turntable
   local nowRad = math.rad(tt.position)
@@ -202,27 +193,34 @@ function drawBackground()
   screen.arc(32,32, 25, 2 + jitter, 3.5 + jitter)
   screen.stroke()
   --accessories
+  screen.aa(1)
   screen.level(5)
   screen.rect(3,61,7,-4)
   screen.rect(13,60,3,1)
-  screen.stroke()
-  screen.level(6)
-  screen.circle(4,52,2)
   screen.fill()
   screen.level(0)
+  screen.circle(4,51,2.5)
   screen.circle(68, 12, 8)
   screen.fill()
   screen.level(3)
   screen.circle(68, 12, 6)
   screen.fill()
   --tone arm
-  screen.level(8)
+  screen.level(10)
   screen.move(68,12)
-  screen.line(59, 30)
-  screen.line(57, 40)
-  screen.line(48, 50)
-  screen.line(50, 46)
-  screen.stroke()
+  local pro = 0
+  if waveform.isLoaded then
+    pro = ((waveform.position * 1024) / waveform.length)
+  end
+  screen.aa(1)
+  screen.line_rel(-7.5 - pro * 2.8 ,10 - pro * 2) --short
+  screen.line_rel(-1.5 - pro * 7, 19 - pro * 5) --long
+  screen.line_rel(-7 - pro * 3.5, 9 - pro * 2.5) --short2
+  screen.line_rel(2 - pro * 1, -4 - pro * -0.5) --head
+  screen.stroke()--[[
+  screen.level(2)
+  screen.line_rel(2,2)
+  screen.stroke()]]--
   screen.aa(0)
   -- speed fader base
   screen.level(4)
@@ -251,10 +249,9 @@ function drawBackground()
   end  
   drawClock(osdate)
   --time elapsed / remaining
-  screen.move(128,64)
-  screen.text_right(util.s_to_hms(math.floor(((waveform.position * 1024) / waveform.length) * (waveform.length / waveform.rate))))
-  screen.move(128,8)
-  screen.text_right("x")
+  if waveform.length then
+    screen.text_rotate(128,30,util.s_to_hms(math.floor((((waveform.length - waveform.position * 1024)) / waveform.length) * (waveform.length / waveform.rate))), 270)
+  end
   screen.fill()
 end
 
@@ -276,18 +273,15 @@ function drawSegmentsAll()
 end
 
 function drawClock(x)
-  screen.move(75,6)
-  screen.text_right(x)
+  screen.move(0,6)
+  screen.text(x)
   screen.fill()
 end
 
 function drawWaveform()
 	--waveform
-	screen.level(3)
-	screen.move(80,48)
-	screen.line(128,48)
-	screen.stroke()
-	screen.level(8)
+	screen.aa(0)
+	--waveform proper
 	if waveform.isLoaded then
     for i=1, 64, 1 do
     	local width = 24
@@ -298,11 +292,18 @@ function drawWaveform()
     	if playhead < 1 then playhead = playhead + #waveform.samples end
     	local sample = waveform.samples[playhead]
     	if sample then
+    	  screen.level(math.floor(1 + math.abs(sample) * 8))
         screen.move(x + sample * width, 64-i)
   	    screen.line(x - sample * width, 64-i)
   	    screen.stroke()
   	 end
     end
+  	screen.level(3)
+	  for i=80, 128, 1 do
+	    if i % 8 == 0 then 
+	      screen.pixel(i + 4,48)
+	    end
+	  end
 	else
 	  screen.move(110,30)
 	  screen.text_center("K1+K3 to")
