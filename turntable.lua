@@ -5,6 +5,14 @@ fileselect = require "fileselect"
 
 function init_params()
   params:add_separator('Turntable')
+  
+  params:add_binary('loop', 'Loop', 'toggle', 1)
+  params:set_action('loop', function(x)
+    for i = 1, 2, 1 do
+      softcut.loop(i,x)
+    end
+  end)
+
   params:add_option('rpm', 'record rpm', rpmOptions, 1)
   params:set_action('rpm', function(x)
     if x == 1 then tt.rpm = 100/3 end
@@ -47,19 +55,21 @@ function init()
   
   rpmOptions = { "33 1/3", "45", "78" }
   tt = {}
-  tt.position = 270
   --tt.faderRate = 1
   tt.rpm = 33.3
   tt.playRate = 0.
   tt.destinationRate = 0.
-  tt.inertia = 0.3
+  tt.nudgeRate = 0.
+  tt.inertia = 0.1
   tt.position = 0
-
+  
   init_params()
 
   playing = false
   paused = false
   weLoading = false
+  
+  pausedHand = 15
 
   heldKeys = {}
   
@@ -89,10 +99,10 @@ function init()
     softcut.loop_end(i,10)
     softcut.position(i,0)
     -- set voices rate to 1.0 and no fade
-    softcut.rate(i, tt.playRate)
+    softcut.rate(i, 0)
     softcut.fade_time(i,0)
     -- disable voices play
-    softcut.play(i,0)
+    softcut.play(i,1)
   end
   softcut.pan(1,-1)
   softcut.pan(2,1)
@@ -120,6 +130,15 @@ end
 
 function get_position(x, pos)
 	waveform.position = pos * waveform.rate / 1024
+	if params:get('loop') == 0 and pos > ((waveform.length - 1000) / waveform.rate) then
+	  print("hit end of file")
+	 for i = 1, 2, 1 do
+	  playing = false
+	  tt.destinationRate = 0
+	  softcut.play(i,0)
+	  softcut.position(i,0)
+	 end
+	end
 end
 
 function redraw_sample(seconds, samples)
@@ -172,6 +191,10 @@ function drawBackground()
   screen.level(8)
   screen.circle(32,32,10) --sticker
   screen.fill()
+  screen.level(0)
+  screen.arc(32,32,8,(tt.position / 360 - 90), (tt.position / 360 - 90) + 1)
+  screen.arc(32,32,2,(tt.position / 360 - 90), (tt.position / 360 - 90) + 1)
+  screen.fill()
   screen.level(1)
   screen.circle(32,32,1) --spindle
   screen.fill()
@@ -184,44 +207,70 @@ function drawBackground()
   screen.fill()--]]
   --grooves
   screen.level(1)
-  if tt.destinationRate == 1 then
-    jitter = util.clamp(jitter + math.random(3)/25 - 0.06, -0.05,0.05)
+  if playing then
+    jitter = util.clamp(jitter + math.random(2)/25 - 0.06, -0.05,0.05)
   end
   screen.level(2)
   screen.arc(32,32, 25, 5.2 + jitter, 5.4 + jitter)
   screen.stroke()
-  screen.arc(32,32, 25, 2 + jitter, 3.5 + jitter)
+  screen.arc(32,32, 25, 1.5 + jitter, 2 + jitter)
   screen.stroke()
   --accessories
   screen.aa(1)
-  screen.level(5)
+  -- play/stop button
+  if playing then screen.level(5) else screen.level(3) end
   screen.rect(3,61,7,-4)
+  screen.fill()
+  screen.rect(3,61,7,-4)
+  screen.stroke()
+  screen.aa(0) -- button text
+  screen.level(2)
+  screen.pixel(4,59)
+  screen.pixel(6,59)
+  screen.pixel(8,59)
+  screen.fill()
+  screen.aa(1)
+  screen.level(5)
   screen.rect(13,60,3,1)
   screen.fill()
   screen.level(0)
-  screen.circle(4,51,2.5)
-  screen.circle(68, 12, 8)
+  screen.circle(68, 12, 8) -- tone arm base
   screen.fill()
   screen.level(3)
-  screen.circle(68, 12, 6)
+  screen.circle(68, 12, 6) -- tone arm base
   screen.fill()
+  screen.level(0)
+  screen.circle(4,51,3) -- turny thing
+  screen.fill()
+  if playing then -- play light
+    screen.level(6)
+    screen.arc(4,51,3, 5.3,6.2)
+    screen.arc(4,51,7, 5.3,6.2)
+    screen.fill()
+  end
   --tone arm
+  screen.line_width(2)
   screen.level(10)
-  screen.move(68,12)
+  screen.move(69,11)
   local pro = 0
   if waveform.isLoaded then
     pro = ((waveform.position * 1024) / waveform.length)
   end
   screen.aa(1)
+  --[[
   screen.line_rel(-7.5 - pro * 2.8 ,10 - pro * 2) --short
   screen.line_rel(-1.5 - pro * 7, 19 - pro * 5) --long
   screen.line_rel(-7 - pro * 3.5, 9 - pro * 2.5) --short2
+  ]]--
+  screen.curve_rel(-19 - pro * 8, 25 - pro * 8, 5 - pro * 1, 5 - pro * 1, -18 - pro * 11, 40 - pro * 8)
+  screen.move_rel(-1,-1)
   screen.line_rel(2 - pro * 1, -4 - pro * -0.5) --head
-  screen.stroke()--[[
+  screen.stroke()
+  --[[
   screen.level(2)
   screen.line_rel(2,2)
   screen.stroke()]]--
-  screen.aa(0)
+  screen.line_width(1)
   -- speed fader base
   screen.level(4)
   screen.rect(75,62, -8, -35)
@@ -240,6 +289,26 @@ function drawBackground()
   screen.level(15)
   screen.text_rotate(73, 60, params:get'speed', 270)
   screen.fill()
+  if heldKeys[2] then
+    pausedHand = pausedHand - 12
+    if pausedHand < 0 then pausedHand = 0 end
+  end
+  if not heldKeys[2] and pausedHand < 15 then pausedHand = pausedHand + 3 end
+  screen.level(5)
+  screen.circle(35, pausedHand + 60, 8)
+  screen.fill()
+
+end
+
+function drawUI()
+  screen.level(15)
+  if heldKeys[1] then
+    screen.move(3,61)
+    screen.text("loop: "..params:get('loop'))
+    screen.move(105,61)
+    screen.text("load?")
+    screen.fill()
+  end
   -- clock
   clockCounter = clockCounter - 1
   if clockCounter < 1 then
@@ -247,12 +316,14 @@ function drawBackground()
     osdate = os.date()
     osdate = osdate:sub(12,16)
   end  
-  drawClock(osdate)
+  screen.move(0,6)
+  screen.text(osdate)
   --time elapsed / remaining
   if waveform.length then
-    screen.text_rotate(128,30,util.s_to_hms(math.floor((((waveform.length - waveform.position * 1024)) / waveform.length) * (waveform.length / waveform.rate))), 270)
+    local remaining = util.s_to_hms(math.floor((((waveform.length - waveform.position * 1024)) / waveform.length) * (waveform.length / waveform.rate)))
+    remaining = remaining:sub(3,7)
+    screen.text_rotate(128,26,"-"..remaining, 270)
   end
-  screen.fill()
 end
 
 function drawSegmentsAll()
@@ -269,13 +340,6 @@ function drawSegmentsAll()
   --speed fader
   screen.aa(0)
   screen.rect(124,1+(tt.faderRate * 59/2), -9, 4)
-  screen.fill()
-end
-
-function drawClock(x)
-  screen.move(0,6)
-  screen.text(x)
-  screen.fill()
 end
 
 function drawWaveform()
@@ -310,7 +374,6 @@ function drawWaveform()
 	  screen.move(110,38)
 	  screen.text_center("load file")
 	end
-	screen.fill()
 end
 
 function redraw()
@@ -319,6 +382,8 @@ function redraw()
 			screen.clear()
 			drawBackground()
 			drawWaveform()
+			drawUI()
+			screen.fill()
 		end
   end
 
@@ -333,17 +398,18 @@ function redraw_clock() ----- a clock that draws space
       redraw() -------------- redraw space
       screen_dirty = false -- and everything is clean again
     end
+    tt.nudgeRate = 0
   end
 end
 
 function play_clock()
   while true do
     clock.sleep(1/240)
-    if playing or (tt.playRate > 0.001 or tt.playRate < -0.001) then
-      tt.playRate = tt.playRate + ((params:get('speed') * tt.destinationRate - tt.playRate) * tt.inertia / (120/15))
+    --if playing or (tt.playRate > 0.001 or tt.playRate < -0.001) then
+      tt.playRate = tt.playRate + ((params:get('speed') * (tt.nudgeRate + tt.destinationRate) - tt.playRate) * tt.inertia / (120/15))
       tt.position = tt.position + tt.playRate * (360 / ((60 / tt.rpm) * 15))
       screen.dirty = true
-    else tt.playRate = 0 end
+    --else tt.playRate = 0 end
     softcut.rate(1,tt.playRate)
     softcut.rate(2,tt.playRate)
   end
@@ -366,11 +432,11 @@ function enc(e, d)
     paused = false
   --Not Shifting
     if (e == 3) then
-      tt.playRate = tt.playRate + d * 1/100
+      --tt.nudgeRate = d / 10
     end
     
     if (e == 2) then
-      tt.playRate = tt.playRate + d * 1/3
+      --tt.nudgeRate = d * 5
     end
     
     if (e == 1) then
@@ -381,9 +447,7 @@ function enc(e, d)
 end
 
 function key(k, z)
-  
-  
-  
+
   heldKeys[k] = z == 1
 
   -- load sample
@@ -396,7 +460,7 @@ function key(k, z)
     if k == 1 then
       
     end
-    if k == 3 and not heldKeys[1] and not weLoading then
+    if k == 3 and not heldKeys[1] and not weLoading then --PLAY/STOP
       if playing then
         playing = false
         tt.destinationRate = 0
@@ -409,16 +473,31 @@ function key(k, z)
       end
     end
   end
-  
-  if k == 2 then
-    if z == 1 then
-      tt.destinationRate = 0
-      tt.inertia = 0.7
-    else 
-      tt.destinationRate = 1
-      tt.inertia = 0.3
-    end
+
+  if k == 3 and z == 1 and heldKeys[2] then --WHEEEEEL UPPPP
+    tt.nudgeRate = -20
+    tt.inertia = 0.8
   end
+
+  
+  if k == 2 and heldKeys[1] and z==0 then
+    params:set('loop', math.abs(params:get('loop') - 1))
+  end
+  
+  if k == 2 and not heldKeys[1] and z == 1 then
+      paused = true
+      if playing then 
+        tt.destinationRate = 0
+        tt.inertia = 0.7
+      end
+    else 
+      paused = false
+      if playing then
+        tt.destinationRate = 1
+        tt.inertia = 0.3
+      end
+    end
+  
   screenDirty = true
 end
 
