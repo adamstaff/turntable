@@ -136,15 +136,19 @@ end
 
 function get_position(x, pos)
   pos = pos * (48000 / waveform.rate)
-	waveform.position = pos * waveform.rate / 1024
-	if params:get('loop') == 0 and pos > ((waveform.length - 1000) / waveform.rate) then
-	  print("hit end of file")
-	 for i = 1, 2, 1 do
-	  playing = false
-	  tt.destinationRate = 0
-	  softcut.play(i,0)
-	  softcut.position(i,0)
-	 end
+  waveform.position = pos * waveform.rate / 1024
+	if params:get('loop') == 0 then
+	  if pos > ((waveform.length - 1000) / waveform.rate) or pos < 0 then
+	    print("hit end of file")
+	    for i = 1, 2, 1 do
+	      tt.destinationRate = 0
+	      tt.playRate = 0
+	      tt.nudgeRate = 0
+	      softcut.position(i,0.1)
+	      softcut.play(i,1)
+	      playing = false
+	     end
+  	end
 	end
 end
 
