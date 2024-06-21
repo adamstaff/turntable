@@ -33,10 +33,8 @@ tt.recordSize = 27 end
 tt.recordSpeed = 78 end
   end)
 
-  ctrlSpeed = controlspec.def{min = 0.625, max = 1.6, warp = 'exp', step = 0.01, default = 1, units = 'x', quantum = 0.01, wrap = false}
-  
-  params:add_control('speed', 'Turntable Speed', ctrlSpeed)
-  params:set_action('speed', function(x) tt.faderRate = x end)
+  params:add_number('faderSpeed', 'Pitch', -8, 8, 1)
+  params:set_action('faderSpeed', function(x) tt.faderRate = 2^(x/12) end) 
   
   params:add_text('file', 'File: ', "")
 
@@ -465,7 +463,7 @@ function enc(e, d)
     end
     
     if (e == 1) then
-      params:delta('speed', d)
+      params:delta('faderSpeed', d)
     end
   end
   screenDirty = true
