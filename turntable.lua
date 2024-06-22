@@ -21,22 +21,37 @@ function init_params()
     if x == 1 then tt.rpm = 100/3 end
     if x == 2 then tt.rpm = 45 end
     if x == 3 then tt.rpm = 78 end
+    tt.mismatch = tt.rpm / tt.recordSpeed
   end)
 
   params:add_option('rrpm', 'record rpm', rpmOptions, 1)
   params:set_action('rrpm', function(x)
-    if x == 1 then tt.recordSpeed = 100/3
-tt.recordSize = 27 end
-    if x == 2 then tt.recordSpeed = 45
-tt.recordSize = 27 end
-    if x == 3 then tt.recordSize = 16
-tt.recordSpeed = 78 end
+    if x == 1 then 
+      tt.recordSpeed = 100/3
+      tt.recordSize = 27
+      tt.holeSize = 1
+      tt.stickerSize = 9
+    end
+    if x == 2 then 
+      tt.recordSpeed = 45
+      tt.recordSize = 16
+      tt.holeSize = 3
+      tt.stickerSize = 7
+    end
+    if x == 3 then 
+      tt.recordSpeed = 78
+      tt.recordSize = 27
+      tt.holeSize = 1
+      tt.stickerSize = 9
+    end
+    tt.mismatch = tt.rpm / tt.recordSpeed
   end)
 
-  params:add_number('faderSpeed', 'Pitch', -8, 8, 1)
-  params:set_action('faderSpeed', function(x) tt.faderRate = 2^(x/12) end) 
+  params:add_number('faderSpeed', 'Pitch', -8, 8, 0)
+  params:set_action('faderSpeed', function(x) tt.faderSpeed = 2^(x/12) end) 
   
-  params:add_text('file', 'File: ', "")
+  params:add_file('file', 'File: ', "")
+  params:set_action('file', function(x) load_file(x) end)
 
   -- here, we set our PSET callbacks for save / load:
   params.action_write = function(filename,name,number)
@@ -69,15 +84,27 @@ function init()
   
   rpmOptions = { "33 1/3", "45", "78" }
   tt = {}
-  --tt.faderRate = 1
   tt.rpm = 33.3
-tt.recordSize = 27
-tt.recordSpeed = 33.33
+  tt.recordSize = 27
+  tt.recordSpeed = 33.33
   tt.playRate = 0.
   tt.destinationRate = 0.
   tt.nudgeRate = 0.
   tt.inertia = 0.1
   tt.position = 0
+  tt.faderSpeed = 1
+  tt.stickerSize = 9
+  tt.stickerHole = 1
+  tt.mismatch = 1
+  
+  waveform = {}
+  waveform.isLoaded = false
+  waveform.samples = {}
+  waveform.rate = 44100
+  waveform.position = 0
+  waveform.length = false
+  
+  heldKeys = {}
   
   init_params()
 
@@ -86,8 +113,6 @@ tt.recordSpeed = 33.33
   weLoading = false
   
   pausedHand = 15
-
-  heldKeys = {}
   
   softcut.event_render(copy_samples)
   softcut.event_phase(get_position)
@@ -130,8 +155,8 @@ tt.recordSpeed = 33.33
   softcut.phase_quant(1, 1/60)
   
   --temp load a file
-  load_file(_path.audio..'/Breaks/Adrift Break.wav', 0, 0, -1, 0, 1)
-  waveform.isLoaded = true
+  --load_file(_path.audio..'/Breaks/Adrift Break.wav', 0, 0, -1, 0, 1)
+  --waveform.isLoaded = true
 end
 
 function copy_samples(ch, start, length, samples)
@@ -205,37 +230,32 @@ function drawBackground()
  screen.level(5)
   screen.circle(32,32,30)  
   screen.fill()
-    --record
-  screen.level(0)
-  screen.circle(32,32,tt.recordSize) --vinyl
-  screen.fill()
-  screen.level(15)
-  screen.circle(32,32,10) --sticker
-  screen.fill()
-  screen.level(0)
-  screen.arc(32,32,8,(tt.position / 360 - 90), (tt.position / 360 - 90) + 1)
-  screen.arc(32,32,2,(tt.position / 360 - 90), (tt.position / 360 - 90) + 1)
-  screen.fill()
-  screen.level(1)
-  screen.circle(32,32,1) --spindle
-  screen.fill()
-  --[[turntable
-  local nowRad = math.rad(tt.position)
-  screen.aa(1)
-  screen.level(5)
-  screen.arc(32, 32, 29, nowRad, nowRad + 1/3/14)
-  screen.line(30,30)
-  screen.fill()--]]
-  --grooves
-  screen.level(1)
-  if playing then
-    jitter = util.clamp(jitter + math.random(2)/25 - 0.06, -0.05,0.05)
+  if waveform.isLoaded then
+      --record
+    screen.level(0)
+    screen.circle(32,32,tt.recordSize) --vinyl
+    screen.fill()
+    screen.level(15)
+    screen.circle(32,32,tt.stickerSize) --sticker
+    screen.fill()
+    screen.level(0) -- label arc
+    screen.arc(32,32,tt.stickerSize - 1, math.rad(tt.position - 90), math.rad(tt.position - 90) + 1)
+    screen.arc(32,32,tt.holeSize + 1, math.rad(tt.position - 90), math.rad(tt.position - 90) + 1)
+    screen.fill()
+    --grooves
+    screen.level(1)
+    if playing then
+      jitter = util.clamp(jitter + math.random(2)/25 - 0.06, -0.05,0.05)
+    end
+    screen.level(2)
+    screen.arc(32,32, tt.recordSize - 2, 5.2 + jitter, 5.4 + jitter)
+    screen.stroke()
+    screen.arc(32,32, tt.recordSize - 2, 1.5 + jitter, 2 + jitter)
+    screen.stroke()
   end
-  screen.level(2)
-  screen.arc(32,32, 25, 5.2 + jitter, 5.4 + jitter)
-  screen.stroke()
-  screen.arc(32,32, 25, 1.5 + jitter, 2 + jitter)
-  screen.stroke()
+  screen.level(1)
+  screen.circle(32,32,tt.holeSize) --spindle
+  screen.fill()
   --accessories
   screen.aa(1)
   -- play/stop button
@@ -260,6 +280,7 @@ function drawBackground()
   screen.level(3)
   screen.circle(68, 12, 6) -- tone arm base
   screen.fill()
+  -- 
   screen.level(0)
   screen.circle(4,51,3) -- turny thing
   screen.fill()
@@ -278,14 +299,17 @@ function drawBackground()
     pro = ((waveform.position * 1024) / waveform.length)
   end
   screen.aa(1)
-  --[[
-  screen.line_rel(-7.5 - pro * 2.8 ,10 - pro * 2) --short
-  screen.line_rel(-1.5 - pro * 7, 19 - pro * 5) --long
-  screen.line_rel(-7 - pro * 3.5, 9 - pro * 2.5) --short2
-  ]]--
-  screen.curve_rel(-19 - pro * 8, 25 - pro * 8, 5 - pro * 1, 5 - pro * 1, -18 - pro * 11, 40 - pro * 8)
+   -- arm
+  screen.curve_rel(
+    -19 - pro * 8, 
+    25 - pro * 8, 
+    5 - pro * 1, 
+    5 - pro * 1, 
+    -18 - pro * 11, 
+    40 - pro * 8
+  )
   screen.move_rel(-1,-1)
-  screen.line_rel(2 - pro * 1, -4 - pro * -0.5) --head
+  screen.line_rel(2, -1) --head
   screen.stroke()
   --[[
   screen.level(2)
@@ -305,10 +329,10 @@ function drawBackground()
   --speed fader
   screen.aa(0)
   screen.level(0)
-  screen.rect(74, 27 + ctrlSpeed:unmap(params:get('speed')) * 30, -7, 4)
+  screen.rect(74, 43 + 1.8 * params:get('faderSpeed'), -6, 4)
   screen.fill()
   screen.level(15)
-  screen.text_rotate(73, 60, params:get'speed', 270)
+  screen.text_rotate(73, 60, params:get('faderSpeed'), 270)
   screen.fill()
   if heldKeys[2] then
     pausedHand = pausedHand - 12
@@ -347,7 +371,7 @@ function drawUI()
   end
 end
 
-function drawSegmentsAll()
+--[[function drawSegmentsAll()
   local nowRad = math.rad(util.round(tt.position, 360/24))
   --turntable
   screen.aa(1)
@@ -361,7 +385,7 @@ function drawSegmentsAll()
   --speed fader
   screen.aa(0)
   screen.rect(124,1+(tt.faderRate * 59/2), -9, 4)
-end
+end]]--
 
 function drawWaveform()
   --warning!!
@@ -410,7 +434,7 @@ function redraw()
 			drawWaveform()
 			drawUI()
 			screen.fill()
-			tt.position = tt.position + tt.playRate * (360 / ((60 / tt.rpm) * 15))
+			tt.position = tt.position + tt.playRate * ((tt.rpm/60)*360)/60
 		end
   end
 
@@ -419,11 +443,11 @@ function redraw()
 end
 
 function redraw_clock() ----- a clock that draws space
-  while true do ------------- "while true do" means "do this forever"
-    clock.sleep(1/60) ------- pause for a fifteenth of a second (aka 15fps)
+  while true do
+    clock.sleep(1/60)
     if (screenDirty or playing) and not weLoading then ---- only if something changed
-      redraw() -------------- redraw space
-      screen_dirty = false -- and everything is clean again
+      redraw()
+      screen_dirty = false
     end
     tt.nudgeRate = 0
   end
@@ -432,7 +456,7 @@ end
 function play_clock()
   while true do
     clock.sleep(1/240)
-    tt.playRate = tt.playRate + ((params:get('speed') * (tt.nudgeRate + tt.destinationRate) - tt.playRate) * tt.inertia / (120/15))
+    tt.playRate = tt.playRate + (tt.faderSpeed * (tt.nudgeRate + tt.destinationRate * tt.mismatch) - tt.playRate) * tt.inertia / (120/15)
     softcut.rate(1,tt.playRate)
     softcut.rate(2,tt.playRate)
   end
@@ -446,7 +470,7 @@ function enc(e, d)
     	
     end
     if e == 2 then
-      
+      tt.nudgeRate = d * 10
     end
     if e == 3 then
       
@@ -463,7 +487,7 @@ function enc(e, d)
     end
     
     if (e == 1) then
-      params:delta('faderSpeed', d)
+      params:set('faderSpeed', util.round(params:get('faderSpeed') + d/5, 0.2))
     end
   end
   screenDirty = true
@@ -484,11 +508,27 @@ function key(k, z)
       
     end
   end
-
-  if k == 3 then
-    if z == 1 and heldKeys[2] then --WHEEEEEL UPPPP
-      tt.nudgeRate = -60
+  
+  if k == 2 and heldKeys[1] and z==0 then
+    params:set('loop', math.abs(params:get('loop') - 1))
+  end
+  
+  if k == 2 and not heldKeys[1] and z == 1 then
+      paused = true
+      if playing then 
+        tt.destinationRate = 0
+        tt.inertia = 0.7
+      end
+  end
+  if k == 2 and not heldKeys[1] and z == 0 then
+    paused = false
+    if playing then
+      tt.destinationRate = 1
+      tt.inertia = 0.3
     end
+  end
+  
+  if k == 3 then
     if z == 1 and not heldKeys[1] and not heldKeys[2] and not weLoading then --PLAY/STOP
       if playing then
         playing = false
@@ -502,25 +542,11 @@ function key(k, z)
       end
     end
   end
-
   
-  if k == 2 and heldKeys[1] and z==0 then
-    params:set('loop', math.abs(params:get('loop') - 1))
+  if heldKeys[2] and heldKeys[3] then --wheeeell upp
+    tt.playRate = -40
+    tt.inertia = 0.1
   end
-  
-  if k == 2 and not heldKeys[1] and z == 1 then
-      paused = true
-      if playing then 
-        tt.destinationRate = 0
-        tt.inertia = 0.7
-      end
-    else 
-      paused = false
-      if playing then
-        tt.destinationRate = 1
-        tt.inertia = 0.3
-      end
-    end
   
   screenDirty = true
 end
