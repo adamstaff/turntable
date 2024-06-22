@@ -1,4 +1,18 @@
 -- turntable
+-- v0.1
+-- By Adam Staff
+--
+-- Load with K1+K3
+-- Play with K3
+-- Pause with K2
+-- Pitch with E1
+-- Small nudge with E3
+-- Large nudge with E2
+-- Huge nudge with K1+E2
+-- Backspin with K2+K3
+-- Toggle loop with K1+K2
+-- Waveform zoom with K1+E3
+-- Params for more params
 
 util = require "util"
 fileselect = require "fileselect"
@@ -50,7 +64,7 @@ function init_params()
   params:add_number('faderSpeed', 'Pitch', -8, 8, 0)
   params:set_action('faderSpeed', function(x) tt.faderSpeed = 2^(x/12) end) 
   
-  params:add_option('zoom', 'waveform zoom', zoomOptions, 3)
+  params:add_option('zoom', 'waveform zoom', zoomOptions, 4, 'x')
   params:set_action('zoom', function(x) 
     waveform.zoom = zoomOptions[params:get('zoom')]
     if waveform.isLoaded then
@@ -91,7 +105,7 @@ function init()
   play_clock_id = clock.run(play_clock)
   
   rpmOptions = { "33 1/3", "45", "78" }
-  zoomOptions = {0.25, 0.5, 1, 2, 4}
+  zoomOptions = {0.125, 0.25, 0.5, 1, 1.5, 2, 4}
   tt = {}
   tt.rpm = 33.3
   tt.recordSize = 27
@@ -173,21 +187,23 @@ function copy_samples(ch, start, length, samples)
 end
 
 function get_position(x, pos)
-  pos = pos * (48000 / waveform.rate)
-  waveform.position = pos * waveform.rate / 1024
-	if params:get('loop') == 0 then
-	  if pos > ((waveform.length - 1000) / waveform.rate) or pos < 0 then
-	    print("hit end of file")
-	    for i = 1, 2, 1 do
-	      tt.destinationRate = 0
-	      tt.playRate = 0
-	      tt.nudgeRate = 0
-	      softcut.position(i,0.1)
-	      softcut.play(i,1)
-	      playing = false
-	     end
+  if waveform.isLoaded then
+    pos = pos * (48000 / waveform.rate)
+    waveform.position = pos * waveform.rate / 1024
+  	if params:get('loop') == 0 then
+  	  if pos > ((waveform.length - 1000) / waveform.rate) or pos < 0 then
+  	    print("hit end of file")
+  	    for i = 1, 2, 1 do
+  	      tt.destinationRate = 0
+  	      tt.playRate = 0
+  	      tt.nudgeRate = 0
+  	      softcut.position(i,0.1)
+  	      softcut.play(i,1)
+  	      playing = false
+  	     end
+    	end
   	end
-	end
+  end
 end
 
 function redraw_sample(seconds, samples)
@@ -367,7 +383,7 @@ function drawUI()
   screen.move(0,6)
   screen.text(osdate)
   --time elapsed / remaining
-  if waveform.isLoaded then
+  if waveform.isLoaded and waveform.length and waveform.rate then
     local remaining = util.s_to_hms(math.floor((((waveform.length - waveform.position * 1024)) / waveform.length) * (waveform.length / waveform.rate)))
     remaining = remaining:sub(3,7)
     screen.text_rotate(128,26,"-"..remaining, 270)
@@ -376,7 +392,7 @@ end
 
 function drawWaveform()
   --warning flasher!!
-  if params:get('loop') == 0 and params:get('warningOn') == 1 and math.floor((((waveform.length - waveform.position * 1024)) / waveform.length) * (waveform.length / waveform.rate)) < params:get('warning') and clockCounter < 15 then
+  if params:get('loop') == 0 and params:get('warningOn') == 1 and math.floor((((waveform.length - waveform.position * 1024)) / waveform.length) * (waveform.length / waveform.rate)) < params:get('warning') and clockCounter < 15 and playing then
     screen.rect(80,0,48,64)
     screen.fill()
   end
@@ -388,11 +404,12 @@ function drawWaveform()
     	local width = 24
     	local x = 104
       local offset = -16
-    	local playhead = math.floor(waveform.position) + i + offset
-    	if playhead >= #waveform.samples then playhead = playhead - #waveform.samples end
-    	if playhead < 1 then playhead = playhead + #waveform.samples end
+    	local playhead = math.floor(waveform.position / waveform.zoom) + i + offset
+    	if playhead >= #waveform.samples and params:get('loop') == 1 then playhead = playhead - #waveform.samples end
+    	if playhead < 1 and params:get('loop') == 1 then playhead = playhead + #waveform.samples end
     	local sample = waveform.samples[playhead]
     	if sample then
+    	  if playhead == 1 then sample = 1 end
     	  screen.level(math.floor(1 + math.abs(sample) * 15))
         screen.move(x + sample * width, 64-i)
   	    screen.line(x - sample * width, 64-i)
@@ -460,7 +477,7 @@ function enc(e, d)
       tt.nudgeRate = d * 10
     end
     if e == 3 then
-      params:delta('zoom',d)
+      params:set('zoom', params:get('zoom') - d)
     end
   else
     paused = false
