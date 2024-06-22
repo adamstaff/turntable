@@ -50,6 +50,14 @@ function init_params()
   params:add_number('faderSpeed', 'Pitch', -8, 8, 0)
   params:set_action('faderSpeed', function(x) tt.faderSpeed = 2^(x/12) end) 
   
+  params:add_option('zoom', 'waveform zoom', zoomOptions, 3)
+  params:set_action('zoom', function(x) 
+    waveform.zoom = zoomOptions[params:get('zoom')]
+    if waveform.isLoaded then
+      redraw_sample(waveform.length * ((waveform.rate / 48000) / waveform.rate), waveform.length)
+    end
+  end)
+  
   params:add_file('file', 'File: ', "")
   params:set_action('file', function(x) load_file(x) end)
 
@@ -83,6 +91,7 @@ function init()
   play_clock_id = clock.run(play_clock)
   
   rpmOptions = { "33 1/3", "45", "78" }
+  zoomOptions = {0.25, 0.5, 1, 2, 4}
   tt = {}
   tt.rpm = 33.3
   tt.recordSize = 27
@@ -102,7 +111,8 @@ function init()
   waveform.samples = {}
   waveform.rate = 44100
   waveform.position = 0
-  waveform.length = false
+  waveform.length = 0
+  waveform.zoom = 1
   
   heldKeys = {}
   
@@ -116,13 +126,6 @@ function init()
   
   softcut.event_render(copy_samples)
   softcut.event_phase(get_position)
-  
-  waveform = {}
-  waveform.isLoaded = false
-  waveform.samples = {}
-  waveform.rate = 44100
-  waveform.position = 0
-  waveform.length = false
   
   -- clear buffer
   softcut.buffer_clear()
@@ -189,7 +192,7 @@ end
 
 function redraw_sample(seconds, samples)
   print("copying samples")
-  samples = math.floor(samples / 1024)
+  samples = math.floor(samples / (1024 * waveform.zoom))
   softcut.render_buffer(1, 0, seconds, samples)
 end
 
@@ -364,31 +367,15 @@ function drawUI()
   screen.move(0,6)
   screen.text(osdate)
   --time elapsed / remaining
-  if waveform.length then
+  if waveform.isLoaded then
     local remaining = util.s_to_hms(math.floor((((waveform.length - waveform.position * 1024)) / waveform.length) * (waveform.length / waveform.rate)))
     remaining = remaining:sub(3,7)
     screen.text_rotate(128,26,"-"..remaining, 270)
   end
 end
 
---[[function drawSegmentsAll()
-  local nowRad = math.rad(util.round(tt.position, 360/24))
-  --turntable
-  screen.aa(1)
-  screen.level(0)
-  for i = 1, 48, 1 do
-    local nowRad = nowRad * i / 5
-    screen.arc(32, 32, 25, nowRad, nowRad + math.rad(360/48))
-    screen.line(30,30)
-  end
-  screen.fill()
-  --speed fader
-  screen.aa(0)
-  screen.rect(124,1+(tt.faderRate * 59/2), -9, 4)
-end]]--
-
 function drawWaveform()
-  --warning!!
+  --warning flasher!!
   if params:get('loop') == 0 and params:get('warningOn') == 1 and math.floor((((waveform.length - waveform.position * 1024)) / waveform.length) * (waveform.length / waveform.rate)) < params:get('warning') and clockCounter < 15 then
     screen.rect(80,0,48,64)
     screen.fill()
@@ -473,7 +460,7 @@ function enc(e, d)
       tt.nudgeRate = d * 10
     end
     if e == 3 then
-      
+      params:delta('zoom',d)
     end
   else
     paused = false
