@@ -126,6 +126,7 @@ function init()
   waveform.rate = 44100
   waveform.position = 0
   waveform.length = 0
+  waveform.lengthInS = 0
   waveform.zoom = 1
   
   heldKeys = {}
@@ -172,12 +173,13 @@ function init()
   softcut.phase_quant(1, 1/60)
   
   --temp load a file
-  --load_file(_path.audio..'/Breaks/Adrift Break.wav', 0, 0, -1, 0, 1)
-  --waveform.isLoaded = true
+  load_file(_path.audio..'/Breaks/Adrift Break.wav', 0, 0, -1, 0, 1)
+  waveform.isLoaded = true
 end
 
 function copy_samples(ch, start, length, samples)
 	print("loading "..#samples.." samples")
+	waveform.samples = {}
   for i = 1, #samples, 1 do
     waveform.samples[i] = samples[i]
   end
@@ -188,10 +190,10 @@ end
 
 function get_position(x, pos)
   if waveform.isLoaded then
-    pos = pos * (48000 / waveform.rate)
-    waveform.position = pos * waveform.rate / (1024)
+    waveform.position = (pos / waveform.lengthInS) -- decmal position
+    waveform.position = waveform.position * #waveform.samples
   	if params:get('loop') == 0 then
-  	  if pos > ((waveform.length - 1000) / waveform.rate) or pos < 0 then
+  	  if waveform.position / #waveform.samples > 0.99 or waveform.position < 0 then
   	    print("hit end of file")
         tt.destinationRate = 0
         tt.playRate = 0
@@ -209,7 +211,6 @@ function get_position(x, pos)
 end
 
 function redraw_sample(seconds, samples)
-  print("copying samples")
   samples = math.floor(samples / (1024 * waveform.zoom))
   softcut.render_buffer(1, 0, seconds, samples)
 end
@@ -220,19 +221,19 @@ function load_file(file)
     --get file info
     local ch, length, rate = audio.file_info(file)
     --calc length in seconds
-    local lengthInS = length * ((rate / 48000) / rate)
-    print("sample length is "..lengthInS)
+    waveform.lengthInS = length * ((rate / 48000) / rate)
+    print("sample length is "..waveform.lengthInS)
     print("sample rate is "..rate)
     waveform.rate = rate
     waveform.length = length
     --load file into buffer (file, start_source (s), start_destination (s), duration (s), preserve, mix)
     softcut.buffer_read_stereo(file, 0, 0, -1, 0, 1)
     --read samples into waveformSamples (number of samples)
-    redraw_sample(lengthInS, length)
+    redraw_sample(waveform.lengthInS, length)
     --set start/end loop positions
     for i=1, 2, 1 do
       softcut.loop_start(i,0)
-      softcut.loop_end(i, lengthInS)
+      softcut.loop_end(i, waveform.lengthInS)
     end
     --update param
     params:set("file",file,0)
@@ -385,8 +386,8 @@ function drawUI()
   screen.move(0,6)
   screen.text(osdate)
   --time elapsed / remaining
-  if waveform.isLoaded and waveform.length and waveform.rate then
-    local remaining = util.s_to_hms(math.floor((((waveform.length - waveform.position * 1024)) / waveform.length) * (waveform.length / waveform.rate)))
+  if waveform.isLoaded and #waveform.samples > 0 and waveform.rate > 0 then
+    local remaining = util.s_to_hms(math.floor((((#waveform.samples - waveform.position) / #waveform.samples) * waveform.lengthInS)))
     remaining = remaining:sub(3,7)
     screen.text_rotate(128,26,"-"..remaining, 270)
   end
@@ -402,22 +403,25 @@ function drawWaveform()
 	screen.aa(0)
 	--waveform proper
 	if waveform.isLoaded then
+  	local width = 24
+  	local x = 104
+    local offset = -16
+	  -- for each pixel row, from bottom up
     for i=1, 64, 1 do
-    	local width = 24
-    	local x = 104
-      local offset = -16
-    	local playhead = math.floor(waveform.position / waveform.zoom) + i + offset
-    	if playhead >= #waveform.samples then
-    	  if params:get('loop') == 1 then playhead = playhead - #waveform.samples 
-    	  else playhead = 1
+      -- set the position we'll read a sample from
+    	local drawhead = math.floor(waveform.position) + i + offset
+    	if drawhead >= #waveform.samples then
+    	  if params:get('loop') == 1 then drawhead = drawhead - #waveform.samples
+    	  else drawhead = -1
     	  end
     	end
-    	if playhead < 1 then
-      	if params:get('loop') == 1 then playhead = playhead + #waveform.samples 
-      	else playhead = 1
+    	if drawhead < 1 then
+      	if params:get('loop') == 1 then drawhead = drawhead + #waveform.samples 
+      	else drawhead = -1
       	end
-      end
-    	local sample = waveform.samples[playhead]
+    	end
+    	local sample = 0
+    	if drawhead == -1 then sample = 0 else sample = waveform.samples[drawhead] end
     	if sample then
     	  if playhead == 1 then sample = 1 end
     	  screen.level(math.floor(1 + math.abs(sample) * 15))
