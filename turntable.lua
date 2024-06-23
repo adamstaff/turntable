@@ -237,6 +237,8 @@ function load_file(file)
     end
     --update param
     params:set("file",file,0)
+    softcut.position(1,0)
+    softcut.position(2,0)
   end
   weLoading = false
   heldKeys[1] = false
@@ -474,7 +476,10 @@ end
 function play_clock()
   while true do
     clock.sleep(1/240)
-    tt.playRate = tt.playRate + (tt.faderSpeed * (tt.nudgeRate + tt.destinationRate * tt.mismatch) - tt.playRate) * tt.inertia / (120/15)
+    local get_to = tt.faderSpeed * tt.mismatch * tt.destinationRate + tt.nudgeRate
+    local how_far = (get_to - tt.playRate) * tt.inertia
+    local scaling = 8
+    tt.playRate = tt.playRate + how_far / scaling
     softcut.rate(1,tt.playRate)
     softcut.rate(2,tt.playRate)
   end
