@@ -189,18 +189,20 @@ end
 function get_position(x, pos)
   if waveform.isLoaded then
     pos = pos * (48000 / waveform.rate)
-    waveform.position = pos * waveform.rate / 1024
+    waveform.position = pos * waveform.rate / (1024)
   	if params:get('loop') == 0 then
   	  if pos > ((waveform.length - 1000) / waveform.rate) or pos < 0 then
   	    print("hit end of file")
+        tt.destinationRate = 0
+        tt.playRate = 0
+        tt.nudgeRate = 0
   	    for i = 1, 2, 1 do
-  	      tt.destinationRate = 0
-  	      tt.playRate = 0
-  	      tt.nudgeRate = 0
-  	      softcut.position(i,0.1)
+  	      softcut.rate(i,0)
+  	      softcut.position(i,0.01)
   	      softcut.play(i,1)
-  	      playing = false
-  	     end
+  	      softcut.position(i,0.01)
+  	    end
+        playing = false
     	end
   	end
   end
@@ -405,8 +407,16 @@ function drawWaveform()
     	local x = 104
       local offset = -16
     	local playhead = math.floor(waveform.position / waveform.zoom) + i + offset
-    	if playhead >= #waveform.samples and params:get('loop') == 1 then playhead = playhead - #waveform.samples end
-    	if playhead < 1 and params:get('loop') == 1 then playhead = playhead + #waveform.samples end
+    	if playhead >= #waveform.samples then
+    	  if params:get('loop') == 1 then playhead = playhead - #waveform.samples 
+    	  else playhead = 1
+    	  end
+    	end
+    	if playhead < 1 then
+      	if params:get('loop') == 1 then playhead = playhead + #waveform.samples 
+      	else playhead = 1
+      	end
+      end
     	local sample = waveform.samples[playhead]
     	if sample then
     	  if playhead == 1 then sample = 1 end
