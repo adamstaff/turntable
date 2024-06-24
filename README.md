@@ -17,16 +17,23 @@ Requires: norns, some wavs to play
 ### Documentation
 
 K1+K3: Load a wav file
+
 K3: play / stop
+
 K2: pause (put your hand on the record)
 
 E1: pitch
+
 E2: nudge
+
 E3: small nudge
+
 K1+E2: big nudge
+
 K2+K3: backspin
 
 K1+K2: toggle loop
+
 K1+E3: waveform zoom
 
 See the params menu for some other fun stuff like changing the player and record rpm. [Get your 'slowlene' on](https://youtube.com/watch?v=CMrfM711vXI)!
