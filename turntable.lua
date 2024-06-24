@@ -1,18 +1,23 @@
--- turntable
--- v0.1
+-- turntable v1.0
 -- By Adam Staff
 --
--- Load with K1+K3
--- Play with K3
--- Pause with K2
--- Pitch with E1
--- Small nudge with E3
--- Large nudge with E2
--- Huge nudge with K1+E2
--- Backspin with K2+K3
--- Toggle loop with K1+K2
--- Waveform zoom with K1+E3
--- Params for more params
+--
+--
+--
+--
+--    ▼ instructions below ▼
+-- K1+K3: Load a wav file
+-- K3: play / stop
+-- K2: pause
+--
+-- E1: pitch
+-- E2: nudge
+-- E3: small nudge
+-- K1+E2: big nudge
+-- K2+K3: backspin
+--
+-- K1+K2: toggle loop
+-- K1+E3: waveform zoom
 
 util = require "util"
 fileselect = require "fileselect"
@@ -172,9 +177,8 @@ function init()
   softcut.poll_start_phase(1)
   softcut.phase_quant(1, 1/60)
   
-  --temp load a file
-  load_file(_path.audio..'/Breaks/Adrift Break.wav', 0, 0, -1, 0, 1)
-  waveform.isLoaded = true
+  --uncomment to auto load a file
+  --load_file(_path.audio..'/Your Foder/My Song.wav', 0, 0, -1, 0, 1)
 end
 
 function copy_samples(ch, start, length, samples)
@@ -320,7 +324,7 @@ function drawBackground()
   screen.move(69,11)
   local pro = 0
   if waveform.isLoaded then
-    pro = ((waveform.position * 1024) / waveform.length)
+    pro = ((waveform.position * 1024 * waveform.zoom) / waveform.length)
   end
   screen.aa(1)
    -- arm
