@@ -73,7 +73,11 @@ function init_params()
   params:set_action('zoom', function(x) 
     waveform.zoom = zoomOptions[params:get('zoom')]
     if waveform.isLoaded then
+      local pos = waveform.position / #waveform.samples
       redraw_sample(waveform.length * ((waveform.rate / 48000) / waveform.rate), waveform.length)
+      --reset get position
+      local newamt = waveform.length / (1024 * waveform.zoom)
+      waveform.position = math.floor(pos * newamt)
     end
   end)
   
@@ -174,7 +178,7 @@ function init()
   --weIniting = false
   screenDirty = true
 
-  softcut.poll_start_phase(1)
+  softcut.poll_start_phase()
   softcut.phase_quant(1, 1/60)
   
   --uncomment to auto load a file
@@ -194,8 +198,8 @@ end
 
 function get_position(x, pos)
   if waveform.isLoaded then
-    waveform.position = (pos / waveform.lengthInS) -- decmal position
-    waveform.position = waveform.position * #waveform.samples
+    waveform.position = (pos / waveform.lengthInS) -- decimal position
+    waveform.position = math.floor(waveform.position * #waveform.samples) -- sample position
   	if params:get('loop') == 0 then
   	  if waveform.position / #waveform.samples > 0.99 or waveform.position < 0 then
   	    print("hit end of file")
@@ -246,6 +250,7 @@ function load_file(file)
   end
   weLoading = false
   heldKeys[1] = false
+  screenDirty = false
 end
 
 function drawBackground()
@@ -318,27 +323,74 @@ function drawBackground()
     screen.arc(4,51,7, 5.3,6.2)
     screen.fill()
   end
-  --tone arm
+  -- tone arm
   screen.line_width(2)
   screen.level(15)
-  screen.move(69,11)
-  local pro = 0
-  if waveform.isLoaded then
-    pro = ((waveform.position * 1024 * waveform.zoom) / waveform.length)
-  end
   screen.aa(1)
-   -- arm
-  screen.curve_rel(
-    -19 - pro * 8, 
-    25 - pro * 8, 
-    5 - pro * 1, 
-    5 - pro * 1, 
-    -18 - pro * 11, 
-    40 - pro * 8
+  
+  local arm_base_x, arm_base_y = 69, 11
+  local record_center_x, record_center_y = 32, 32
+  
+  -- Calculate the progress of the playback
+  local progress = 0
+  if waveform.isLoaded then
+    progress = (waveform.position * 1024 * waveform.zoom) / waveform.length
+  end
+  
+  -- Calculate the position of the tone arm tip
+  local start_radius = tt.recordSize - 1
+  local end_radius = tt.stickerSize + 2
+  local current_radius = start_radius - progress * (start_radius - end_radius)
+  
+  -- Set the fixed angle of the tone arm
+  local arm_angle = math.pi * 1.75
+  
+  -- Calculate the tip position of the tone arm
+  local tip_x = record_center_x + math.cos(arm_angle) * current_radius
+  local tip_y = record_center_y - math.sin(arm_angle) * current_radius
+  
+  -- Calculate the arm vector
+  local arm_vec_x = tip_x - arm_base_x
+  local arm_vec_y = tip_y - arm_base_y
+  local arm_length = math.sqrt(arm_vec_x^2 + arm_vec_y^2)
+  
+  -- Normalize the arm vector
+  local arm_norm_x = arm_vec_x / arm_length
+  local arm_norm_y = arm_vec_y / arm_length
+  
+  -- Calculate perpendicular vector (rotate 90 degrees)
+  local perp_x = -arm_norm_y
+  local perp_y = arm_norm_x
+  
+  -- Define control point offsets
+  local cp1_along = 0.5  -- 30% along the arm
+  local cp2_along = 0.7  -- 70% along the arm
+  local cp_offset = -5   -- Perpendicular offset, adjust as needed
+  
+  -- Calculate control points
+  local cp1_x = arm_base_x + arm_vec_x * cp1_along - perp_x * cp_offset
+  local cp1_y = arm_base_y + arm_vec_y * cp1_along + perp_y * cp_offset
+  
+  local cp2_x = arm_base_x + arm_vec_x * cp2_along + perp_x * cp_offset
+  local cp2_y = arm_base_y + arm_vec_y * cp2_along + perp_y * cp_offset
+  
+  -- Draw the tone arm
+  screen.move(arm_base_x, arm_base_y)
+  screen.curve(
+    cp1_x, cp1_y,  -- Control point 1
+    cp2_x, cp2_y,  -- Control point 2
+    tip_x, tip_y   -- End point
   )
-  screen.move_rel(-1,-1)
-  screen.line_rel(2, -1) --head
+  
+  -- Draw the tone arm head
+  screen.move(tip_x, tip_y)
+  screen.line_rel(2, -1)
   screen.stroke()
+
+	-- Draw the tone arm head
+	screen.move(tip_x, tip_y)
+	screen.line_rel(2, -1)
+	screen.stroke()
   --[[
   screen.level(2)
   screen.line_rel(2,2)
@@ -484,6 +536,7 @@ function play_clock()
     local how_far = (get_to - tt.playRate) * tt.inertia
     local scaling = 8
     tt.playRate = tt.playRate + how_far / scaling
+    if tt.playRate < 0.001 and tt.playRate > -0.001 then tt.playRate = 0 end
     softcut.rate(1,tt.playRate)
     softcut.rate(2,tt.playRate)
   end
@@ -504,7 +557,7 @@ function enc(e, d)
     end
   else
     paused = false
-  --Not Shifting
+    --Not Shifting
     if (e == 3) then
       tt.nudgeRate = d / 10
     end
@@ -579,5 +632,6 @@ function key(k, z)
 end
 
 function cleanup() --------------- cleanup() is automatically called on script close
-  clock.cancel(redraw_clock_id) -- melt our clock vie the id we noted
+  clock.cancel(redraw_clock_id)
+  clock.cancel(play_clock_id)
 end
