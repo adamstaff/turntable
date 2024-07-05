@@ -1,11 +1,12 @@
--- turntable v1.0
--- By Adam Staff
+-- 
+--         turntable v2.0
+--         By Adam Staff
 --
 --
 --
---
---
+--               
 --    ▼ instructions below ▼
+--
 -- K1+K3: Load a wav file
 -- K3: play / stop
 -- K2: pause
@@ -18,23 +19,27 @@
 --
 -- K1+K2: toggle loop
 -- K1+E3: waveform zoom
+--
+-- Map a MIDI controller to
+-- 'Fader Position' to fade
+-- between the turntable and
+-- norns stereo inputs
+--
 
 util = require "util"
 fileselect = require "fileselect"
 
 function init_params()
-  params:add_separator('Turntable')
-  
+	-- Turntable controls
+  params:add_separator('Turntable Controls')
   params:add_binary('loop', 'Loop', 'toggle', 1)
   params:set_action('loop', function(x)
     for i = 1, 2, 1 do
       softcut.loop(i,x)
     end
   end)
-  
   params:add_binary('warningOn', 'Warning Timer', 'toggle', 1)
   params:add_number('warning', "Warning Length", 1, 60, 10)
-
   params:add_option('prpm', 'player rpm', rpmOptions, 1)
   params:set_action('prpm', function(x)
     if x == 1 then tt.rpm = 100/3 end
@@ -42,7 +47,6 @@ function init_params()
     if x == 3 then tt.rpm = 78 end
     tt.mismatch = tt.rpm / tt.recordSpeed
   end)
-
   params:add_option('rrpm', 'record rpm', rpmOptions, 1)
   params:set_action('rrpm', function(x)
     if x == 1 then 
@@ -65,10 +69,20 @@ function init_params()
     end
     tt.mismatch = tt.rpm / tt.recordSpeed
   end)
-
-  params:add_number('faderSpeed', 'Pitch', -8, 8, 0)
-  params:set_action('faderSpeed', function(x) tt.faderSpeed = 2^(x/12) end) 
+  params:add_number('pitchSpeed', 'Pitch', -8, 8, 0)
+  params:set_action('pitchSpeed', function(x) tt.pitch = 2^(x/12) end)
   
+  -- fader controls
+  params:add_separator('Crossfader Controls')
+  params:add_number('faderPosition', 'Fader Position', 0, 127, 127)
+  params:add_option('faderSharpness', 'Crossfade Sharpness', faderOptions, 1)
+  params:add_binary('equalPower', 'Equal Power Crossfade', 'toggle', 0)
+  params:set_action('equalPower', function() setFader(params:get('faderPosition')) end )
+  params:set_action('faderSharpness', function() setFader(params:get('faderPosition')) end)
+  params:set_action('faderPosition', function() setFader(params:get('faderPosition')) end)
+  
+  --other controls
+  params:add_separator('Other')
   params:add_option('zoom', 'waveform zoom', zoomOptions, 4, 'x')
   params:set_action('zoom', function(x) 
     waveform.zoom = zoomOptions[params:get('zoom')]
@@ -79,12 +93,11 @@ function init_params()
       local newamt = waveform.length / (1024 * waveform.zoom)
       waveform.position = math.floor(pos * newamt)
     end
-  end)
-  
+  end)  
   params:add_file('file', 'File: ', "")
   params:set_action('file', function(x) load_file(x) end)
 
-  -- here, we set our PSET callbacks for save / load:
+  -- preset callbacks
   params.action_write = function(filename,name,number)
     os.execute("mkdir -p "..norns.state.data.."/"..number.."/")
     print("finished writing '"..filename.."'", number)
@@ -100,21 +113,25 @@ function init_params()
 end
 
 function init()
+
   weIniting = true
-  introCounter = 5*15
   clockCounter = 60
   osdate = os.date()
   osdate = osdate:sub(12,16)
   jitter = 0
   
+	-- encoder settings
   norns.enc.sens(2,1)
   norns.enc.accel(2,-2)
 
+	-- clocks setup
   redraw_clock_id = clock.run(redraw_clock)
   play_clock_id = clock.run(play_clock)
   
+  -- turntable variables
   rpmOptions = { "33 1/3", "45", "78" }
   zoomOptions = {0.125, 0.25, 0.5, 1, 1.5, 2, 4}
+  faderOptions = {0, 1, 3, 10}
   tt = {}
   tt.rpm = 33.3
   tt.recordSize = 27
@@ -124,11 +141,12 @@ function init()
   tt.nudgeRate = 0.
   tt.inertia = 0.1
   tt.position = 0
-  tt.faderSpeed = 1
+  tt.pitch = 1
   tt.stickerSize = 9
   tt.stickerHole = 1
   tt.mismatch = 1
   
+  --waveform variables
   waveform = {}
   waveform.isLoaded = false
   waveform.samples = {}
@@ -145,44 +163,34 @@ function init()
   playing = false
   paused = false
   weLoading = false
+  screenDirty = true
   
   pausedHand = 15
   
+  -- softcut setup
   softcut.event_render(copy_samples)
   softcut.event_phase(get_position)
-  
-  -- clear buffer
   softcut.buffer_clear()
   for i=1, 2, 1 do
-    -- enable voices
     softcut.enable(i,1)
-    -- set voices to buffers
     softcut.buffer(i,i)
-    -- set voices level to 1.0
     softcut.level(i,1.0)
     softcut.level_slew_time(i,0.5)
-    -- voices enable loop
     softcut.loop(i,1)
     softcut.loop_start(i,0)
     softcut.loop_end(i,10)
     softcut.position(i,0)
-    -- set voices rate to 1.0 and no fade
     softcut.rate(i, 0)
     softcut.fade_time(i,0)
-    -- disable voices play
     softcut.play(i,1)
   end
   softcut.pan(1,-1)
   softcut.pan(2,1)
-
-  --weIniting = false
-  screenDirty = true
-
   softcut.poll_start_phase()
   softcut.phase_quant(1, 1/60)
   
   --uncomment to auto load a file
-  --load_file(_path.audio..'/Your Foder/My Song.wav', 0, 0, -1, 0, 1)
+  --load_file(_path.audio..'/Folder/Audio.wav', 0, 0, -1, 0, 1)
 end
 
 function copy_samples(ch, start, length, samples)
@@ -216,6 +224,23 @@ function get_position(x, pos)
     	end
   	end
   end
+end
+
+function setFader(x)
+	local y = 0
+	local y2 = 1
+	x = x/127
+	if params:get('equalPower') == 1 then
+		y = math.cos((math.pi / 4) * (2 * x - 1) ^ (2 * params:get('faderSharpness') + 1) + 1)
+		y2 = math.cos((math.pi / 4) * (2 * (x - 1) - 1) ^ (2 * params:get('faderSharpness') + 1) + 1)
+	else
+		y = math.cos((math.pi / 2) * (x ^ params:get('faderSharpness')))
+		y2 = math.cos((math.pi / 2) * ((x - 1) ^ params:get('faderSharpness')))
+	end
+	-- turntable level (softcut)
+	audio.level_cut(y)
+	-- input level
+	audio.level_adc(y2)
 end
 
 function redraw_sample(seconds, samples)
@@ -323,57 +348,45 @@ function drawBackground()
     screen.arc(4,51,7, 5.3,6.2)
     screen.fill()
   end
-  -- tone arm
+  -- tone arm --
   screen.line_width(2)
   screen.level(15)
   screen.aa(1)
-  
   local arm_base_x, arm_base_y = 69, 11
   local record_center_x, record_center_y = 32, 32
-  
   -- Calculate the progress of the playback
   local progress = 0
   if waveform.isLoaded then
     progress = (waveform.position * 1024 * waveform.zoom) / waveform.length
   end
-  
   -- Calculate the position of the tone arm tip
   local start_radius = tt.recordSize - 1
   local end_radius = tt.stickerSize + 2
   local current_radius = start_radius - progress * (start_radius - end_radius)
-  
   -- Set the fixed angle of the tone arm
   local arm_angle = math.pi * 1.75
-  
   -- Calculate the tip position of the tone arm
   local tip_x = record_center_x + math.cos(arm_angle) * current_radius
   local tip_y = record_center_y - math.sin(arm_angle) * current_radius
-  
   -- Calculate the arm vector
   local arm_vec_x = tip_x - arm_base_x
   local arm_vec_y = tip_y - arm_base_y
   local arm_length = math.sqrt(arm_vec_x^2 + arm_vec_y^2)
-  
   -- Normalize the arm vector
   local arm_norm_x = arm_vec_x / arm_length
   local arm_norm_y = arm_vec_y / arm_length
-  
   -- Calculate perpendicular vector (rotate 90 degrees)
   local perp_x = -arm_norm_y
   local perp_y = arm_norm_x
-  
   -- Define control point offsets
   local cp1_along = 0.5  -- 30% along the arm
   local cp2_along = 0.7  -- 70% along the arm
   local cp_offset = -5   -- Perpendicular offset, adjust as needed
-  
   -- Calculate control points
   local cp1_x = arm_base_x + arm_vec_x * cp1_along - perp_x * cp_offset
   local cp1_y = arm_base_y + arm_vec_y * cp1_along + perp_y * cp_offset
-  
   local cp2_x = arm_base_x + arm_vec_x * cp2_along + perp_x * cp_offset
   local cp2_y = arm_base_y + arm_vec_y * cp2_along + perp_y * cp_offset
-  
   -- Draw the tone arm
   screen.move(arm_base_x, arm_base_y)
   screen.curve(
@@ -381,21 +394,16 @@ function drawBackground()
     cp2_x, cp2_y,  -- Control point 2
     tip_x, tip_y   -- End point
   )
-  
   -- Draw the tone arm head
   screen.move(tip_x, tip_y)
   screen.line_rel(2, -1)
   screen.stroke()
-
 	-- Draw the tone arm head
 	screen.move(tip_x, tip_y)
 	screen.line_rel(2, -1)
 	screen.stroke()
-  --[[
-  screen.level(2)
-  screen.line_rel(2,2)
-  screen.stroke()]]--
   screen.line_width(1)
+
   -- speed fader base
   screen.level(5)
   screen.rect(75,62, -8, -35)
@@ -409,20 +417,21 @@ function drawBackground()
   --speed fader
   screen.aa(0)
   screen.level(0)
-  screen.rect(74, 43 + 1.8 * params:get('faderSpeed'), -6, 4)
+  screen.rect(74, 43 + 1.8 * params:get('pitchSpeed'), -6, 4)
   screen.fill()
   screen.level(15)
-  screen.text_rotate(73, 60, params:get('faderSpeed'), 270)
+  screen.text_rotate(73, 60, params:get('pitchSpeed'), 270)
   screen.fill()
   if heldKeys[2] then
     pausedHand = pausedHand - 12
     if pausedHand < 0 then pausedHand = 0 end
   end
   if not heldKeys[2] and pausedHand < 15 then pausedHand = pausedHand + 3 end
-  screen.level(8)
-  screen.circle(35, pausedHand + 60, 8)
-  screen.fill()
-
+	if pausedHand < 15 then
+		screen.level(8)
+		screen.circle(35, pausedHand + 60, 8)
+		screen.fill()
+	end
 end
 
 function drawUI()
@@ -532,7 +541,7 @@ end
 function play_clock()
   while true do
     clock.sleep(1/240)
-    local get_to = tt.faderSpeed * tt.mismatch * tt.destinationRate + tt.nudgeRate
+    local get_to = tt.pitch * tt.mismatch * tt.destinationRate + tt.nudgeRate
     local how_far = (get_to - tt.playRate) * tt.inertia
     local scaling = 8
     tt.playRate = tt.playRate + how_far / scaling
@@ -567,7 +576,7 @@ function enc(e, d)
     end
     
     if (e == 1) then
-      params:set('faderSpeed', util.round(params:get('faderSpeed') + d/5, 0.2))
+      params:set('pitchSpeed', util.round(params:get('pitchSpeed') + d/5, 0.2))
     end
   end
   screenDirty = true
