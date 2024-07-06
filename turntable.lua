@@ -74,7 +74,7 @@ function init_params()
   
   -- fader controls
   params:add_separator('Crossfader Controls')
-  params:add_number('faderPosition', 'Fader Position', 0, 127, 127)
+  params:add_number('faderPosition', 'Fader Position', 0, 127, 0)
   params:add_option('faderSharpness', 'Crossfade Sharpness', faderOptions, 1)
   params:add_binary('equalPower', 'Equal Power Crossfade', 'toggle', 0)
   params:set_action('equalPower', function() setFader(params:get('faderPosition')) end )
@@ -145,12 +145,13 @@ function init()
   tt.stickerSize = 9
   tt.stickerHole = 1
   tt.mismatch = 1
+  tt.rateRate = 1
   
   --waveform variables
   waveform = {}
   waveform.isLoaded = false
   waveform.samples = {}
-  waveform.rate = 44100
+  waveform.rate = 48000
   waveform.position = 0
   waveform.length = 0
   waveform.lengthInS = 0
@@ -259,6 +260,7 @@ function load_file(file)
     print("sample rate is "..rate)
     waveform.rate = rate
     waveform.length = length
+    tt.rateRate = rate / 48000
     --load file into buffer (file, start_source (s), start_destination (s), duration (s), preserve, mix)
     softcut.buffer_read_stereo(file, 0, 0, -1, 0, 1)
     --read samples into waveformSamples (number of samples)
@@ -541,7 +543,7 @@ end
 function play_clock()
   while true do
     clock.sleep(1/240)
-    local get_to = tt.pitch * tt.mismatch * tt.destinationRate + tt.nudgeRate
+    local get_to = tt.rateRate * tt.pitch * tt.mismatch * tt.destinationRate + tt.nudgeRate
     local how_far = (get_to - tt.playRate) * tt.inertia
     local scaling = 8
     tt.playRate = tt.playRate + how_far / scaling
@@ -562,7 +564,9 @@ function enc(e, d)
       tt.nudgeRate = d * 10
     end
     if e == 3 then
-      params:set('zoom', params:get('zoom') - d)
+      if not heldKeys[2] then
+        params:set('zoom', params:get('zoom') - d)
+      end
     end
   else
     paused = false
