@@ -74,7 +74,7 @@ function init_params()
   
   -- fader controls
   params:add_separator('Crossfader Controls')
-  params:add_number('faderPosition', 'Fader Position', 0, 127, 127)
+  params:add_number('faderPosition', 'Fader Position', 0, 127, 0)
   params:add_option('faderSharpness', 'Crossfade Sharpness', faderOptions, 1)
   params:add_binary('equalPower', 'Equal Power Crossfade', 'toggle', 0)
   params:set_action('equalPower', function() setFader(params:get('faderPosition')) end )
