@@ -1,8 +1,9 @@
-turntable, V2.0
+turntable, V2.1
 
 A turntable for norns
 
-(demo video coming in the future)
+Demo video:
+https://youtu.be/kpuc4MYNU9A?feature=shared
 
 After many years as a musician, I decided this year I wanted to DJ for the first time. I don’t have turntables, but I do have a norns or two. So I made this.
 
@@ -38,6 +39,9 @@ Bring another audio source (say, another norns running turntable, your phone, or
 Map a MIDI controller to the ‘Fader Position’ parameter, and use it to crossfade between turntable and the audio inout
 
 Download
+
+V2.1
+Added param for Turntable Drive
 
 V2.0
 
