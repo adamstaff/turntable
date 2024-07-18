@@ -1,5 +1,5 @@
 -- 
---         turntable v2.0
+--         turntable v2.1
 --         By Adam Staff
 --
 --
@@ -32,14 +32,6 @@ fileselect = require "fileselect"
 function init_params()
 	-- Turntable controls
   params:add_separator('Turntable Controls')
-  params:add_binary('loop', 'Loop', 'toggle', 1)
-  params:set_action('loop', function(x)
-    for i = 1, 2, 1 do
-      softcut.loop(i,x)
-    end
-  end)
-  params:add_binary('warningOn', 'Warning Timer', 'toggle', 1)
-  params:add_number('warning', "Warning Length", 1, 60, 10)
   params:add_option('prpm', 'player rpm', rpmOptions, 1)
   params:set_action('prpm', function(x)
     if x == 1 then tt.rpm = 100/3 end
@@ -71,6 +63,15 @@ function init_params()
   end)
   params:add_number('pitchSpeed', 'Pitch', -8, 8, 0)
   params:set_action('pitchSpeed', function(x) tt.pitch = 2^(x/12) end)
+  params:add_number('drive', 'Turntable Drive', 1, 16, 4)
+  params:add_binary('loop', 'Loop', 'toggle', 0)
+  params:set_action('loop', function(x)
+    for i = 1, 2, 1 do
+      softcut.loop(i,x)
+    end
+  end)
+  params:add_binary('warningOn', 'Warning Timer', 'toggle', 1)
+  params:add_number('warning', "Warning Length", 1, 60, 10)
   
   -- fader controls
   params:add_separator('Crossfader Controls')
@@ -545,8 +546,7 @@ function play_clock()
     clock.sleep(1/240)
     local get_to = tt.rateRate * tt.pitch * tt.mismatch * tt.destinationRate + tt.nudgeRate
     local how_far = (get_to - tt.playRate) * tt.inertia
-    local scaling = 8
-    tt.playRate = tt.playRate + how_far / scaling
+    tt.playRate = tt.playRate + how_far / params:get('drive')
     if tt.playRate < 0.001 and tt.playRate > -0.001 then tt.playRate = 0 end
     softcut.rate(1,tt.playRate)
     softcut.rate(2,tt.playRate)
