@@ -550,6 +550,7 @@ function play_clock()
     if tt.playRate < 0.001 and tt.playRate > -0.001 then tt.playRate = 0 end
     softcut.rate(1,tt.playRate)
     softcut.rate(2,tt.playRate)
+    softcut.voice_sync(2,1,0)
   end
 end
 
