@@ -82,6 +82,14 @@ function init_params()
   params:set_action('faderSharpness', function() setFader(params:get('faderPosition')) end)
   params:set_action('faderPosition', function() setFader(params:get('faderPosition')) end)
   
+  --crow controls
+  params:add_separator('crow')
+  params:add_option('crowmode', 'mode', crowModes, 1)
+  params:set_action('crowmode', function(x)
+    if x == 1 then crow.input[2].stream = crow_rate end
+    if x == 2 then crow.input[2].stream = crow_pos end
+  end)
+  
   --other controls
   params:add_separator('Other')
   params:add_option('zoom', 'waveform zoom', zoomOptions, 4, 'x')
@@ -148,6 +156,7 @@ function init()
   tt.mismatch = 1
   tt.rateRate = 1
   tt.flipflop = true
+  tt.crowRate = 0
   
   --waveform variables
   waveform = {}
@@ -160,6 +169,12 @@ function init()
   waveform.zoom = 1
   
   heldKeys = {}
+  
+    --crow stuff
+  crowModes = { "play / rate", "play / position" }
+  crow.input[1].mode("change", 1.0, 0.1, "both")
+  crow.input[1].change = crow_playstop
+  crow.input[2].mode("stream", 0.1)
   
   init_params()
 
@@ -192,9 +207,9 @@ function init()
   softcut.pan(2,1)
   softcut.poll_start_phase()
   softcut.phase_quant(1, 1/60)
-  
+
   --uncomment to auto load a file
-  --load_file(_path.audio..'/something.wav', 0, 0, -1, 0, 1)
+  load_file(_path.audio..'/Dynamite Remix/130 House Kick Loop 022 bpm120.wav', 0, 0, -1, 0, 1)
 end
 
 function copy_samples(ch, start, length, samples)
@@ -546,28 +561,59 @@ end
 function play_clock()
   while true do
     clock.sleep(1/240)
-    local get_to = tt.rateRate * tt.pitch * tt.mismatch * tt.destinationRate + tt.nudgeRate
-    if tt.playRate ~= get_to then
-      local how_far = (get_to - tt.playRate) * tt.inertia
-      tt.playRate = tt.playRate + how_far / params:get('drive')
-      if tt.playRate < 0.01 and tt.playRate > -0.01 then 
-        tt.playRate = 0 
-        softcut.voice_sync(1,2,0)
-      else
-        if tt.flipflop then
-          for i = 1, 2, 1 do
-            softcut.rate(i,tt.playRate)
-          end
-          tt.flipflop = false
+    if params:get('crowmode') == 1 then
+      local get_to = tt.rateRate * tt.pitch * tt.mismatch * tt.destinationRate + tt.crowRate + tt.nudgeRate
+      if tt.playRate ~= get_to then
+        local how_far = (get_to - tt.playRate) * tt.inertia
+        tt.playRate = tt.playRate + how_far / params:get('drive')
+        if tt.playRate < 0.01 and tt.playRate > -0.01 then 
+          tt.playRate = 0 
+          softcut.voice_sync(1,2,0)
         else
-          for i = 2, 1, -1 do
-            softcut.rate(i,tt.playRate)
+          if tt.flipflop then
+            for i = 1, 2, 1 do
+              softcut.rate(i,tt.playRate)
+            end
+            tt.flipflop = false
+          else
+            for i = 2, 1, -1 do
+              softcut.rate(i,tt.playRate)
+            end
+            tt.flipflop = true
           end
-          tt.flipflop = true
         end
+      end
+    else tt.playRate = tt.destinationRate
+      if tt.flipflop then
+        for i = 1, 2, 1 do
+          softcut.rate(i,tt.playRate)
+        end
+        tt.flipflop = false
+      else
+        for i = 2, 1, -1 do
+          softcut.rate(i,tt.playRate)
+        end
+        tt.flipflop = true
       end
     end
   end
+end
+
+function crow_playstop(v)
+  if v then 
+    playing = true 
+    tt.destinationRate = 1
+  else playing = false 
+    tt.destinationRate = 0
+  end
+end
+
+function crow_rate(v)
+  tt.crowRate = (v/2.5)
+end
+
+function crow_pos(v)
+  print(v)
 end
 
 function enc(e, d)
