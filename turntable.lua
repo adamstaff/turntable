@@ -194,7 +194,7 @@ function init()
   softcut.phase_quant(1, 1/60)
   
   --uncomment to auto load a file
-  load_file(_path.audio..'/Dynamite Remix/130 House Kick Loop 022 bpm120.wav', 0, 0, -1, 0, 1)
+  --load_file(_path.audio..'/something.wav', 0, 0, -1, 0, 1)
 end
 
 function copy_samples(ch, start, length, samples)
