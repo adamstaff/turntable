@@ -1,5 +1,5 @@
 -- 
---         turntable v2.1.1
+--         turntable v3.0
 --         By Adam Staff
 --
 --
@@ -86,8 +86,16 @@ function init_params()
   params:add_separator('crow')
   params:add_option('crowmode', 'mode', crowModes, 1)
   params:set_action('crowmode', function(x)
-    if x == 1 then crow.input[2].stream = crow_rate end
-    if x == 2 then crow.input[2].stream = crow_pos end
+    if x == 1 then 
+        crow.input[1].mode("change", 1.0, 0.1, "both")
+        crow.input[1].change = crow_playstop
+        crow.input[2].stream = crow_rate 
+    end
+    if x == 2 then 
+      crow.input[1].mode("stream", 0.1)
+      crow.input[1].stream = crow_rate
+      crow.input[2].stream = crow_pos 
+    end
   end)
   
   --other controls
@@ -170,10 +178,9 @@ function init()
   
   heldKeys = {}
   
-    --crow stuff
+  --crow stuff
   crowModes = { "play / rate", "play / position" }
-  crow.input[1].mode("change", 1.0, 0.1, "both")
-  crow.input[1].change = crow_playstop
+  crowDestination = 0
   crow.input[2].mode("stream", 0.1)
   
   init_params()
@@ -566,9 +573,10 @@ function play_clock()
       if tt.playRate ~= get_to then
         local how_far = (get_to - tt.playRate) * tt.inertia
         tt.playRate = tt.playRate + how_far / params:get('drive')
+        
         if tt.playRate < 0.01 and tt.playRate > -0.01 then 
           tt.playRate = 0 
-          softcut.voice_sync(1,2,0)
+          --softcut.voice_sync(1,2,0)
         else
           if tt.flipflop then
             for i = 1, 2, 1 do
@@ -583,7 +591,14 @@ function play_clock()
           end
         end
       end
-    else tt.playRate = tt.destinationRate
+    -- for crow mode 2
+    else
+      --get time in seconds between here and there
+      local here = ((waveform.position * 1024) / waveform.length) * waveform.lengthInS
+      local there = crowDestination * waveform.lengthInS
+      local distance = there - here
+      local intime = util.clamp(tt.crowRate + 2.5, 0.01, 5)
+      tt.playRate = distance / intime
       if tt.flipflop then
         for i = 1, 2, 1 do
           softcut.rate(i,tt.playRate)
@@ -613,7 +628,7 @@ function crow_rate(v)
 end
 
 function crow_pos(v)
-  print(v)
+  crowDestination = (v / 10 + 0.5)
 end
 
 function enc(e, d)
