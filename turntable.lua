@@ -1,5 +1,5 @@
 -- 
---         turntable v2.1
+--         turntable v2.1.1
 --         By Adam Staff
 --
 --
@@ -147,6 +147,7 @@ function init()
   tt.stickerHole = 1
   tt.mismatch = 1
   tt.rateRate = 1
+  tt.flipflop = true
   
   --waveform variables
   waveform = {}
@@ -183,8 +184,9 @@ function init()
     softcut.loop_end(i,10)
     softcut.position(i,0)
     softcut.rate(i, 0)
-    softcut.fade_time(i,0)
+    softcut.fade_time(i,0.)
     softcut.play(i,1)
+    softcut.rate_slew_time(i,0.)
   end
   softcut.pan(1,-1)
   softcut.pan(2,1)
@@ -192,7 +194,7 @@ function init()
   softcut.phase_quant(1, 1/60)
   
   --uncomment to auto load a file
-  --load_file(_path.audio..'/Folder/Audio.wav', 0, 0, -1, 0, 1)
+  load_file(_path.audio..'/Dynamite Remix/130 House Kick Loop 022 bpm120.wav', 0, 0, -1, 0, 1)
 end
 
 function copy_samples(ch, start, length, samples)
@@ -251,8 +253,8 @@ function redraw_sample(seconds, samples)
 end
 
 function load_file(file)
-  print('loading file '..file)
   if file and file ~= "cancel" then
+    print('loading file '..file)
     --get file info
     local ch, length, rate = audio.file_info(file)
     --calc length in seconds
@@ -278,7 +280,7 @@ function load_file(file)
   end
   weLoading = false
   heldKeys[1] = false
-  screenDirty = false
+  screenDirty = true
 end
 
 function drawBackground()
@@ -545,12 +547,26 @@ function play_clock()
   while true do
     clock.sleep(1/240)
     local get_to = tt.rateRate * tt.pitch * tt.mismatch * tt.destinationRate + tt.nudgeRate
-    local how_far = (get_to - tt.playRate) * tt.inertia
-    tt.playRate = tt.playRate + how_far / params:get('drive')
-    if tt.playRate < 0.001 and tt.playRate > -0.001 then tt.playRate = 0 end
-    softcut.rate(1,tt.playRate)
-    softcut.rate(2,tt.playRate)
-    softcut.voice_sync(2,1,0)
+    if tt.playRate ~= get_to then
+      local how_far = (get_to - tt.playRate) * tt.inertia
+      tt.playRate = tt.playRate + how_far / params:get('drive')
+      if tt.playRate < 0.01 and tt.playRate > -0.01 then 
+        tt.playRate = 0 
+        softcut.voice_sync(1,2,0)
+      else
+        if tt.flipflop then
+          for i = 1, 2, 1 do
+            softcut.rate(i,tt.playRate)
+          end
+          tt.flipflop = false
+        else
+          for i = 2, 1, -1 do
+            softcut.rate(i,tt.playRate)
+          end
+          tt.flipflop = true
+        end
+      end
+    end
   end
 end
 
@@ -614,7 +630,7 @@ function key(k, z)
         tt.inertia = 0.7
       end
   end
-  if k == 2 and not heldKeys[1] and z == 0 then
+  if k == 2 and z == 0 then
     paused = false
     if playing then
       tt.destinationRate = 1
@@ -629,9 +645,9 @@ function key(k, z)
         tt.destinationRate = 0
       else
         playing = true
-        softcut.voice_sync(2,1,0)
         softcut.play(1,1)
         softcut.play(2,1)
+        --softcut.voice_sync(2,1,0)
         tt.destinationRate = 1
       end
     end
@@ -648,4 +664,5 @@ end
 function cleanup() --------------- cleanup() is automatically called on script close
   clock.cancel(redraw_clock_id)
   clock.cancel(play_clock_id)
+--  clock.cancel(sync_clock_id)
 end
