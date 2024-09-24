@@ -1,4 +1,4 @@
-turntable, V2.1
+turntable, V3
 
 A turntable for norns
 
@@ -38,7 +38,22 @@ To mix:
 Bring another audio source (say, another norns running turntable, your phone, or an sl1200), into the norns stereo input.
 Map a MIDI controller to the ‘Fader Position’ parameter, and use it to crossfade between turntable and the audio inout
 
+Crow:
+Play / Speed mode:
+Input 1: Play, 5V gate
+Input 2: Speed, ±5V
+
+Position / Duration mode:
+Input 1: Go to this position, ±5V
+Input 2: In this amount of time, ±5V
+
 Download
+
+V3.0
+Scratchmaster DJ Crow flew in for their set
+
+V2.1.1
+Improved playback
 
 V2.1
 Added param for Turntable Drive
