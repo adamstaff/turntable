@@ -48,7 +48,7 @@ Engine_turntable : CroneEngine {
 	    var v_dust = Pan2.ar(BBandPass.ar(BBandPass.ar(Dust2.ar(10,2), TRand.ar(170, 3370, dtrig), 3), 5370,0.4) * EnvGen.ar(Env.perc(0.05, 0.05), dtrig), TRand.ar(-1, 1, dtrig), tdust);
 	    var v_rumble = BBandPass.ar(PinkNoise.ar([trumble,trumble]), [13.5,13.5], 1);
 	    var v_motor = BBandPass.ar(WhiteNoise.ar(), 100, 0.1, tmotor) + BBandPass.ar(WhiteNoise.ar(), 150, 0.1, tmotor * 0.5);
-	    var v_mix = (v_noise + v_dust + v_rumble + v_motor) * playrate;
+	    var v_mix = (v_noise + v_dust + v_rumble + v_motor) * Clip.kr(playrate, -1,1);
 			var withnoise = playback + v_mix;
 
 			Out.ar(0, withnoise);
