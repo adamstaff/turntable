@@ -215,7 +215,8 @@ function init()
 	-- engine init
 	engine.prate(0)
 	engine.stiffness(1)
-  engine.skipto(0.0)
+	engine.skipto(0.0)
+	engine.overall(1)
 
 end
 
@@ -243,8 +244,8 @@ function setFader(x)
 		y = math.cos((math.pi / 2) * (x ^ params:get('faderSharpness')))
 		y2 = math.cos((math.pi / 2) * ((x - 1) ^ params:get('faderSharpness')))
 	end
-	-- turntable level (softcut?)
-	audio.level_cut(y)
+	-- turntable engine level
+	engine.overall(y)
 	-- input level
 	audio.level_adc(y2)
 end

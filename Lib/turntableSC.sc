@@ -20,7 +20,7 @@ Engine_turntable : CroneEngine {
 
     // add SynthDefs
 		SynthDef("turntable", {
-			arg t_trigger, prate, stiffness, skipto,
+			arg t_trigger, prate, stiffness, skipto, overall,
 			noise_level, tnoise, tdust, trumble, tmotor;
 			
 			var playrate = Lag3.kr(prate, stiffness);
@@ -42,14 +42,14 @@ Engine_turntable : CroneEngine {
 				phase: playhead,
 				interpolation: 4;
 			);
-	    // noise stuff
-	    var dtrig = Dust.ar(5);
-	    var v_noise = BBandPass.ar(PinkNoise.ar([tnoise,tnoise]), 10000, 5);
-	    var v_dust = Pan2.ar(BBandPass.ar(BBandPass.ar(Dust2.ar(10,2), TRand.ar(170, 3370, dtrig), 3), 5370,0.4) * EnvGen.ar(Env.perc(0.05, 0.05), dtrig), TRand.ar(-1, 1, dtrig), tdust);
-	    var v_rumble = BBandPass.ar(PinkNoise.ar([trumble,trumble]), [13.5,13.5], 1);
-	    var v_motor = BBandPass.ar(WhiteNoise.ar(), 100, 0.1, tmotor) + BBandPass.ar(WhiteNoise.ar(), 150, 0.1, tmotor * 0.5);
-	    var v_mix = (v_noise + v_dust + v_rumble + v_motor) * Clip.kr(playrate, -1,1);
-			var withnoise = playback + v_mix;
+	    	// noise stuff
+		    var dtrig = Dust.ar(5);
+		    var v_noise = BBandPass.ar(PinkNoise.ar([tnoise,tnoise]), 10000, 5);
+		    var v_dust = Pan2.ar(BBandPass.ar(BBandPass.ar(Dust2.ar(10,2), TRand.ar(170, 3370, dtrig), 3), 5370,0.4) * EnvGen.ar(Env.perc(0.05, 0.05), dtrig), TRand.ar(-1, 1, dtrig), tdust);
+		    var v_rumble = BBandPass.ar(PinkNoise.ar([trumble,trumble]), [13.5,13.5], 1);
+		    var v_motor = BBandPass.ar(WhiteNoise.ar(), 100, 0.1, tmotor) + BBandPass.ar(WhiteNoise.ar(), 150, 0.1, tmotor * 0.5);
+		    var v_mix = (v_noise + v_dust + v_rumble + v_motor) * Clip.kr(playrate, -1,1);
+			var withnoise = (playback + v_mix) * overall;
 
 			Out.ar(0, withnoise);
 			// bus output for poll
@@ -67,7 +67,8 @@ Engine_turntable : CroneEngine {
   		\tnoise, 0.35,
   		\tdust, 1.0, 
   		\trumble, 0.9,
-  		\tmotor, 0.5
+  		\tmotor, 0.5,
+  		\overall, 1
   		;
   	]);
 		
