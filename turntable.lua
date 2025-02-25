@@ -217,6 +217,7 @@ function init()
 	engine.stiffness(1)
 	engine.skipto(0.0)
 	engine.overall(1)
+	engine.warble(0)
 
 end
 

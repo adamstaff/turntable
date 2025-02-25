@@ -21,9 +21,9 @@ Engine_turntable : CroneEngine {
     // add SynthDefs
 		SynthDef("turntable", {
 			arg t_trigger, prate, stiffness, skipto, overall,
-			noise_level, tnoise, tdust, trumble, tmotor;
+			noise_level, tnoise, tdust, trumble, tmotor, warble;
 			
-			var playrate = Lag3.kr(prate, stiffness);
+			var playrate = Lag3.kr(prate + (LFNoise2.kr(warble * 4, warble)), stiffness);
 			// playhead
 			var playhead = Phasor.ar(
 				trig: t_trigger,
@@ -68,7 +68,8 @@ Engine_turntable : CroneEngine {
   		\tdust, 1.0, 
   		\trumble, 0.9,
   		\tmotor, 0.5,
-  		\overall, 1
+  		\overall, 1,
+  		\warble, 0
   		;
   	]);
 		
