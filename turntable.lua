@@ -236,6 +236,16 @@ function stopper()
 	end
 end
 
+function copy_samples(ch, start, length, samples)
+        print("loading "..#samples.." samples")
+        waveform.samples = {}
+  for i = 1, #samples, 1 do
+    waveform.samples[i] = samples[i]
+  end
+  print("finished loading waveform")
+  screenDirty = true
+  waveform.isLoaded = true
+end
 function setFader(x)
 	local y = 0
 	local y2 = 1
