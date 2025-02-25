@@ -23,7 +23,7 @@ Engine_turntable : CroneEngine {
 			arg t_trigger, prate, stiffness, skipto, overall,
 			noise_level, tnoise, tdust, trumble, tmotor, warble;
 			
-			var playrate = Lag3.kr(prate + (LFNoise2.kr(warble * 4, warble)), stiffness);
+			var playrate = Lag3.kr(prate + (LFNoise2.kr(prate * 4, warble)), stiffness);
 			// playhead
 			var playhead = Phasor.ar(
 				trig: t_trigger,
