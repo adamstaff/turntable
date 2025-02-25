@@ -253,6 +253,11 @@ function setFader(x)
 	audio.level_adc(y2)
 end
 
+function redraw_sample(seconds, samples)
+  samples = math.floor(samples / (1024 * waveform.zoom))
+  softcut.render_buffer(1, 0, seconds, samples)
+end
+
 function load_file(file)
   if file and file ~= "cancel" then
     print('loading file '..file)
