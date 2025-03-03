@@ -1,5 +1,5 @@
 -- 
---         turntable v2.1.1
+--         turntable v3.0
 --         By Adam Staff
 --
 --
@@ -25,7 +25,10 @@
 -- between the turntable and
 -- norns stereo inputs
 --
+-- see params for lots of
+-- fun things to play with
 
+engine.name = "turntable"
 util = require "util"
 fileselect = require "fileselect"
 
@@ -38,6 +41,7 @@ function init_params()
     if x == 2 then tt.rpm = 45 end
     if x == 3 then tt.rpm = 78 end
     tt.mismatch = tt.rpm / tt.recordSpeed
+    tt.rps = tt.rpm / 60
   end)
   params:add_option('rrpm', 'record rpm', rpmOptions, 1)
   params:set_action('rrpm', function(x)
@@ -63,13 +67,24 @@ function init_params()
   end)
   params:add_number('pitchSpeed', 'Pitch', -8, 8, 0)
   params:set_action('pitchSpeed', function(x) tt.pitch = 2^(x/12) end)
-  params:add_number('drive', 'Turntable Drive', 1, 16, 4)
-  params:add_binary('loop', 'Loop', 'toggle', 0)
-  params:set_action('loop', function(x)
-    for i = 1, 2, 1 do
-      softcut.loop(i,x)
-    end
+  params:add_number('stiffness', 'Turntable Stiffness', 1, 16, 12)
+  params:set_action('stiffness', function(x) engine.stiffness(4 - (x/4)) end)
+  params:add_number('noise', 'Turntable Noise', 0, 200, 0)
+  params:set_action('noise', function(x) 
+    x = x/50
+    engine.tnoise(0.07 * x)
+    engine.trumble(5 * x)
+    engine.tmotor(3 * x)
   end)
+  params:add_number('dust', 'Turntable Dust', 0, 200, 0)
+  params:set_action('dust', function(x) engine.tdust(x/50) end)
+  params:add_number('warble', 'Turntable Warble', 0, 200, 0)
+  params:set_action('warble', function(x) engine.warble(x/800) end)
+  params:add_number('riaa', 'Turntable RIAA Filter', -200, 200, 0)
+  params:set_action('riaa', function(x) engine.riaa(x/100) end)
+  params:add_number('filter', 'Turntable Lofi Filter', 0, 100, 0)
+  params:set_action('filter', function(x) engine.filter(x/100) end)
+  params:add_binary('loop', 'Loop', 'toggle', 0)
   params:add_binary('warningOn', 'Warning Timer', 'toggle', 1)
   params:add_number('warning', "Warning Length", 1, 60, 10)
   
@@ -82,6 +97,20 @@ function init_params()
   params:set_action('faderSharpness', function() setFader(params:get('faderPosition')) end)
   params:set_action('faderPosition', function() setFader(params:get('faderPosition')) end)
   
+  --crow controls
+  params:add_separator('crow')
+  params:add_option('crowmode', 'mode', crowModes, 1)
+  params:set_action('crowmode', function(mode)
+    if mode == 1 then 
+        crow.input[1].mode("change", 1.0, 0.1, "both")
+        crow.input[1].change = crow_playstop
+    end
+    if mode == 2 then 
+      crow.input[1].mode("stream", 0.1)
+      crow.input[1].stream = crow_pos
+    end
+  end)
+  
   --other controls
   params:add_separator('Other')
   params:add_option('zoom', 'waveform zoom', zoomOptions, 4, 'x')
@@ -91,8 +120,8 @@ function init_params()
       local pos = waveform.position / #waveform.samples
       redraw_sample(waveform.length * ((waveform.rate / 48000) / waveform.rate), waveform.length)
       --reset get position
-      local newamt = waveform.length / (1024 * waveform.zoom)
-      waveform.position = math.floor(pos * newamt)
+      --local newamt = waveform.length / (1024 * waveform.zoom)
+      --waveform.position = math.floor(pos * newamt)
     end
   end)  
   params:add_file('file', 'File: ', "")
@@ -135,6 +164,7 @@ function init()
   faderOptions = {0, 1, 3, 10}
   tt = {}
   tt.rpm = 33.3
+  tt.rps = 0.555
   tt.recordSize = 27
   tt.recordSpeed = 33.33
   tt.playRate = 0.
@@ -147,7 +177,7 @@ function init()
   tt.stickerHole = 1
   tt.mismatch = 1
   tt.rateRate = 1
-  tt.flipflop = true
+  tt.crowRate = 0
   
   --waveform variables
   waveform = {}
@@ -161,6 +191,12 @@ function init()
   
   heldKeys = {}
   
+  --crow stuff
+  crowModes = { "play / rate", "position / rate" }
+  crowDestination = 0
+  crow.input[2].mode("stream", 0.1)
+  crow.input[2].stream = crow_rate 
+  
   init_params()
 
   playing = false
@@ -170,64 +206,50 @@ function init()
   
   pausedHand = 15
   
-  -- softcut setup
+  --softcut view setup
   softcut.event_render(copy_samples)
-  softcut.event_phase(get_position)
-  softcut.buffer_clear()
-  for i=1, 2, 1 do
-    softcut.enable(i,1)
-    softcut.buffer(i,i)
-    softcut.level(i,1.0)
-    softcut.level_slew_time(i,0.5)
-    softcut.loop(i,1)
-    softcut.loop_start(i,0)
-    softcut.loop_end(i,10)
-    softcut.position(i,0)
-    softcut.rate(i, 0)
-    softcut.fade_time(i,0.)
-    softcut.play(i,1)
-    softcut.rate_slew_time(i,0.)
-  end
-  softcut.pan(1,-1)
-  softcut.pan(2,1)
-  softcut.poll_start_phase()
-  softcut.phase_quant(1, 1/60)
   
-  --uncomment to auto load a file
-  --load_file(_path.audio..'/something.wav', 0, 0, -1, 0, 1)
+  -- polls
+  -- file position
+  position_poll = poll.set("get_position")
+  position_poll.callback = function(val)
+    waveform.position = val
+    tt.position = (tt.rps * waveform.lengthInS * val * 360) % 360
+  end
+  position_poll.time = 1/60
+  position_poll:start()
+	-- file loaded
+	loaded_poll = poll.set("file_loaded")
+	loaded_poll.callback = function(val)
+	  print("waveformisLoaded = "..val)
+	  waveform.isLoaded = val
+	end
+	loaded_poll:start()
+
+end
+
+function stopper()
+  if waveform.position > 0.99 or waveform.position < 0 then
+    print("hit end of file")
+    tt.destinationRate = 0
+    tt.playRate = 0
+    tt.nudgeRate = 0
+    engine.stiffness(0)
+    engine.prate(0)
+    engine.t_trigger(1)
+    playing = false
+	end
 end
 
 function copy_samples(ch, start, length, samples)
-	print("loading "..#samples.." samples")
-	waveform.samples = {}
+  print("loading "..#samples.." samples")
+  waveform.samples = {}
   for i = 1, #samples, 1 do
     waveform.samples[i] = samples[i]
   end
   print("finished loading waveform")
   screenDirty = true
   waveform.isLoaded = true
-end
-
-function get_position(x, pos)
-  if waveform.isLoaded then
-    waveform.position = (pos / waveform.lengthInS) -- decimal position
-    waveform.position = math.floor(waveform.position * #waveform.samples) -- sample position
-  	if params:get('loop') == 0 then
-  	  if waveform.position / #waveform.samples > 0.99 or waveform.position < 0 then
-  	    print("hit end of file")
-        tt.destinationRate = 0
-        tt.playRate = 0
-        tt.nudgeRate = 0
-  	    for i = 1, 2, 1 do
-  	      softcut.rate(i,0)
-  	      softcut.position(i,0.01)
-  	      softcut.play(i,1)
-  	      softcut.position(i,0.01)
-  	    end
-        playing = false
-    	end
-  	end
-  end
 end
 
 function setFader(x)
@@ -241,8 +263,8 @@ function setFader(x)
 		y = math.cos((math.pi / 2) * (x ^ params:get('faderSharpness')))
 		y2 = math.cos((math.pi / 2) * ((x - 1) ^ params:get('faderSharpness')))
 	end
-	-- turntable level (softcut)
-	audio.level_cut(y)
+	-- turntable engine level
+	engine.overall(y)
 	-- input level
 	audio.level_adc(y2)
 end
@@ -258,25 +280,23 @@ function load_file(file)
     --get file info
     local ch, length, rate = audio.file_info(file)
     --calc length in seconds
-    waveform.lengthInS = length * ((rate / 48000) / rate)
+    if rate > 0 then
+      waveform.lengthInS = length * ((rate / 48000) / rate)
+    end
     print("sample length is "..waveform.lengthInS)
     print("sample rate is "..rate)
+    print("file is"..file)
     waveform.rate = rate
     waveform.length = length
     tt.rateRate = rate / 48000
     --load file into buffer (file, start_source (s), start_destination (s), duration (s), preserve, mix)
+    engine.fileload(file, length)
+    --load file into buffer (file, start_source (s), start_destination (s), duration (s), preserve, mix)
     softcut.buffer_read_stereo(file, 0, 0, -1, 0, 1)
     --read samples into waveformSamples (number of samples)
     redraw_sample(waveform.lengthInS, length)
-    --set start/end loop positions
-    for i=1, 2, 1 do
-      softcut.loop_start(i,0)
-      softcut.loop_end(i, waveform.lengthInS)
-    end
     --update param
     params:set("file",file,0)
-    softcut.position(1,0)
-    softcut.position(2,0)
   end
   weLoading = false
   heldKeys[1] = false
@@ -362,7 +382,7 @@ function drawBackground()
   -- Calculate the progress of the playback
   local progress = 0
   if waveform.isLoaded then
-    progress = (waveform.position * 1024 * waveform.zoom) / waveform.length
+    progress = waveform.position
   end
   -- Calculate the position of the tone arm tip
   local start_radius = tt.recordSize - 1
@@ -439,32 +459,6 @@ function drawBackground()
 	end
 end
 
-function drawUI()
-  screen.level(15)
-  if heldKeys[1] then
-    screen.move(3,61)
-    screen.text("loop: "..params:get('loop'))
-    screen.move(105,61)
-    screen.text("load?")
-    screen.fill()
-  end
-  -- clock
-  clockCounter = clockCounter - 1
-  if clockCounter < 1 then
-    clockCounter = 60
-    osdate = os.date()
-    osdate = osdate:sub(12,16)
-  end  
-  screen.move(0,6)
-  screen.text(osdate)
-  --time elapsed / remaining
-  if waveform.isLoaded and #waveform.samples > 0 and waveform.rate > 0 then
-    local remaining = util.s_to_hms(math.floor((((#waveform.samples - waveform.position) / #waveform.samples) * waveform.lengthInS)))
-    remaining = remaining:sub(3,7)
-    screen.text_rotate(128,26,"-"..remaining, 270)
-  end
-end
-
 function drawWaveform()
   --warning flasher!!
   if params:get('loop') == 0 and params:get('warningOn') == 1 and math.floor((((waveform.length - waveform.position * 1024)) / waveform.length) * (waveform.length / waveform.rate)) < params:get('warning') and clockCounter < 15 and playing then
@@ -481,7 +475,7 @@ function drawWaveform()
 	  -- for each pixel row, from bottom up
     for i=1, 64, 1 do
       -- set the position we'll read a sample from
-    	local drawhead = math.floor(waveform.position) + i + offset
+    	local drawhead = math.floor(waveform.position * #waveform.samples) + i + offset
     	if drawhead >= #waveform.samples then
     	  if params:get('loop') == 1 then drawhead = drawhead - #waveform.samples
     	  else drawhead = -1
@@ -516,6 +510,38 @@ function drawWaveform()
 	end
 end
 
+function drawUI()
+  screen.level(15)
+  if heldKeys[1] then
+    screen.move(3,61)
+    screen.text("loop: "..params:get('loop'))
+    screen.move(105,61)
+    screen.text("load?")
+    screen.fill()
+  end
+  --[[ clock
+  clockCounter = clockCounter - 1
+  if clockCounter < 1 then
+    clockCounter = 60
+    osdate = os.date()
+    osdate = osdate:sub(12,16)
+  end  
+  screen.move(0,6)
+  screen.text(osdate)
+  --]]
+  --time elapsed / remaining
+  if waveform.isLoaded then
+    local remaining = util.s_to_hms(math.floor(((1 - waveform.position) * waveform.lengthInS)))
+    remaining = remaining:sub(3,7)
+    screen.text_rotate(128,26,"-"..remaining, 270)
+  end
+  --[[
+  screen.level(15)
+  screen.move(20,60)
+  screen.text(util.round(tt.playRate, 0.01))
+  --]]
+end
+
 function redraw()
   if not weLoading then
   	if screenDirty or tt.playRate > 0.001 or tt.playRate < 0.001 then
@@ -524,7 +550,6 @@ function redraw()
 			drawWaveform()
 			drawUI()
 			screen.fill()
-			tt.position = tt.position + tt.playRate * ((tt.rpm/60)*360)/60
 		end
   end
 
@@ -543,29 +568,25 @@ function redraw_clock() ----- a clock that draws space
   end
 end
 
-function play_clock()
+function play_clock() ------ churning out updated playrates, and passing them to SC
   while true do
-    clock.sleep(1/240)
-    local get_to = tt.rateRate * tt.pitch * tt.mismatch * tt.destinationRate + tt.nudgeRate
-    if tt.playRate ~= get_to then
-      local how_far = (get_to - tt.playRate) * tt.inertia
-      tt.playRate = tt.playRate + how_far / params:get('drive')
+    clock.sleep(1/24)
+    if params:get('crowmode') == 1 then
+      tt.playRate = tt.rateRate * tt.pitch * tt.mismatch * tt.destinationRate + tt.nudgeRate + tt.crowRate
       if tt.playRate < 0.01 and tt.playRate > -0.01 then 
-        tt.playRate = 0 
-        softcut.voice_sync(1,2,0)
-      else
-        if tt.flipflop then
-          for i = 1, 2, 1 do
-            softcut.rate(i,tt.playRate)
-          end
-          tt.flipflop = false
-        else
-          for i = 2, 1, -1 do
-            softcut.rate(i,tt.playRate)
-          end
-          tt.flipflop = true
-        end
+        tt.playRate = 0
       end
+      --print("setting rate to "..tt.playRate)
+      engine.prate(tt.playRate)
+    else
+      --get time in seconds between here and there
+      local distance = (crowDestination - waveform.position) * waveform.lengthInS
+      local intime = util.clamp(tt.crowRate + 2.5, 0.01, 5)
+      tt.playRate = distance / intime
+      engine.prate(tt.playRate)
+    end
+    if params:get("loop") == 0 then
+      stopper()
     end
   end
 end
@@ -603,6 +624,23 @@ function enc(e, d)
   screenDirty = true
 end
 
+function crow_playstop(v)
+  if v then 
+    playing = true 
+    tt.destinationRate = 1
+  else playing = false 
+    tt.destinationRate = 0
+  end
+end
+
+function crow_rate(v)
+  tt.crowRate = (v/2.5)
+end
+
+function crow_pos(v)
+  crowDestination = (v / 10 + 0.5)
+end
+
 function key(k, z)
 
   heldKeys[k] = z == 1
@@ -611,6 +649,7 @@ function key(k, z)
   if (k == 3 and z ==0 and heldKeys[1]) then
 	  weLoading = true
 		fileselect.enter(_path.audio,load_file)
+		loaded_poll:update()
 	end
 	
   if z == 0 then
@@ -624,17 +663,17 @@ function key(k, z)
   end
   
   if k == 2 and not heldKeys[1] and z == 1 then
-      paused = true
-      if playing then 
-        tt.destinationRate = 0
-        tt.inertia = 0.7
-      end
+    paused = true
+    if playing then 
+      tt.destinationRate = 0
+      engine.stiffness(0.25)
+    end
   end
   if k == 2 and z == 0 then
     paused = false
     if playing then
       tt.destinationRate = 1
-      tt.inertia = 0.3
+      engine.stiffness(1.0)
     end
   end
   
@@ -645,17 +684,15 @@ function key(k, z)
         tt.destinationRate = 0
       else
         playing = true
-        softcut.play(1,1)
-        softcut.play(2,1)
-        --softcut.voice_sync(2,1,0)
         tt.destinationRate = 1
       end
     end
   end
   
   if heldKeys[2] and heldKeys[3] then --wheeeell upp
-    tt.playRate = -40
-    tt.inertia = 0.1
+    engine.stiffness(0.1)
+    engine.prate(-400)
+    engine.stiffness(2)
   end
   
   screenDirty = true

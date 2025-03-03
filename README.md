@@ -1,4 +1,4 @@
-turntable, V2.1
+turntable, V3 - Supercollider engine, and crow
 
 A turntable for norns
 
@@ -9,17 +9,15 @@ After many years as a musician, I decided this year I wanted to DJ for the first
 
 The intention was to squeeze most of the functionality of a single turntable onto norns. And the intention was also to resist making a full DJ app.
 
-Because this uses softcut, softcut’s limitations apply: wavs only, 48kHz recommended, max 5 minutes 49.52 seconds in length.
-
 All gratitude and props to monome, the documentation writers, and the lines community for teaching me how to do this.
 
 Requirements
 
-Requires: norns, some wavs to play
+Requires: norns, some sound to play
 
 Documentation
 
-K1+K3: Load a wav file
+K1+K3: Load a file
 K3: play / stop
 K2: pause (put your hand on the record)
 
@@ -38,10 +36,21 @@ To mix:
 Bring another audio source (say, another norns running turntable, your phone, or an sl1200), into the norns stereo input.
 Map a MIDI controller to the ‘Fader Position’ parameter, and use it to crossfade between turntable and the audio inout
 
+Crow:
+Play / Speed mode:
+Input 1: Play, 5V gate
+Input 2: Speed, ±5V
+
+Position / Duration mode:
+Input 1: Go to this position, ±5V
+Input 2: In this amount of time, ±5V
+
 Download
 
-V2.1
-Added param for Turntable Drive
+V3.0
+
+Completely rewritten playback - now a Supercollider engine. Fixes softcut limitation when working with stereo and changing the rate
+Scratchmaster DJ Crow flew in for their set
 
 V2.0
 
