@@ -1,23 +1,23 @@
-turntable, V3 - Supercollider engine, and crow
+# turntable, V3 - Supercollider engine, and crow
 
-A turntable for norns
+## A turntable for norns
 
 Demo video:
 https://youtu.be/kpuc4MYNU9A?feature=shared
 
-After many years as a musician, I decided this year I wanted to DJ for the first time. I don’t have turntables, but I do have a norns or two. So I made this.
+After many years as a musician, I decided last year I wanted to DJ for the first time. I don’t have turntables, but I do have a norns or two. So I made this.
 
 The intention was to squeeze most of the functionality of a single turntable onto norns. And the intention was also to resist making a full DJ app.
 
 All gratitude and props to monome, the documentation writers, and the lines community for teaching me how to do this.
 
-Requirements
+## Requirements
 
-Requires: norns, some sound to play
+Requires: norns, some wavs to play
 
-Documentation
+## Documentation
 
-K1+K3: Load a file
+K1+K3: Load a wav file
 K3: play / stop
 K2: pause (put your hand on the record)
 
@@ -30,7 +30,7 @@ K2+K3: backspin
 K1+K2: toggle loop
 K1+E3: waveform zoom
 
-See the params menu for fun stuff like changing the player and record rpm. Get your ‘slowlene’ on 28!
+See the params menu for lots of fun stuff
 
 To mix:
 Bring another audio source (say, another norns running turntable, your phone, or an sl1200), into the norns stereo input.
@@ -45,12 +45,15 @@ Position / Duration mode:
 Input 1: Go to this position, ±5V
 Input 2: In this amount of time, ±5V
 
-Download
+## Download
 
 V3.0
 
-Completely rewritten playback - now a Supercollider engine. Fixes softcut limitation when working with stereo and changing the rate
-Scratchmaster DJ Crow flew in for their set
+* completely rewritten playback engine: goodbye softcut, hello SuperCollider :wave:
+* added turntable simulation parameters: noise, dust, warble, riaa filter, lofi filter :black_circle:
+* added two crow :hatched_chick: modes:
+– Play / Rate: input 1 triggers play button (0 / +5V), input 2 CV playback rate (-5 to +5)
+– Position / Rate: input 1 CV “go to here” (-5 to +5), input 2 CV “go this fast” (-5 to +5)
 
 V2.0
 
