@@ -120,8 +120,8 @@ function init_params()
       local pos = waveform.position / #waveform.samples
       redraw_sample(waveform.length * ((waveform.rate / 48000) / waveform.rate), waveform.length)
       --reset get position
-      local newamt = waveform.length / (1024 * waveform.zoom)
-      waveform.position = math.floor(pos * newamt)
+      --local newamt = waveform.length / (1024 * waveform.zoom)
+      --waveform.position = math.floor(pos * newamt)
     end
   end)  
   params:add_file('file', 'File: ', "")
