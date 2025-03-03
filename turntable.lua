@@ -39,6 +39,7 @@ function init_params()
     if x == 2 then tt.rpm = 45 end
     if x == 3 then tt.rpm = 78 end
     tt.mismatch = tt.rpm / tt.recordSpeed
+    tt.rps = tt.rpm / 60
   end)
   params:add_option('rrpm', 'record rpm', rpmOptions, 1)
   params:set_action('rrpm', function(x)
@@ -64,7 +65,8 @@ function init_params()
   end)
   params:add_number('pitchSpeed', 'Pitch', -8, 8, 0)
   params:set_action('pitchSpeed', function(x) tt.pitch = 2^(x/12) end)
-  params:add_number('drive', 'Turntable Drive', 1, 16, 4)
+  params:add_number('stiffness', 'Turntable Stiffness', 1, 16, 12)
+  params:set_action('stiffness', function(x) engine.stiffness(4 - (x/4)) end)
   params:add_number('noise', 'Turntable Noise', 0, 200, 0)
   params:set_action('noise', function(x) 
     x = x/50
@@ -74,8 +76,12 @@ function init_params()
   end)
   params:add_number('dust', 'Turntable Dust', 0, 200, 0)
   params:set_action('dust', function(x) engine.tdust(x/50) end)
-params:add_number('warble', 'Turntable Warble', 0, 200, 0)
-  params:set_action('warble', function(x) engine.warble(x/400) end)
+  params:add_number('warble', 'Turntable Warble', 0, 200, 0)
+  params:set_action('warble', function(x) engine.warble(x/800) end)
+  params:add_number('riaa', 'Turntable RIAA Filter', -200, 200, 0)
+  params:set_action('riaa', function(x) engine.riaa(x/100) end)
+  params:add_number('filter', 'Turntable Lofi Filter', 0, 100, 0)
+  params:set_action('filter', function(x) engine.filter(x/100) end)
   params:add_binary('loop', 'Loop', 'toggle', 0)
   params:add_binary('warningOn', 'Warning Timer', 'toggle', 1)
   params:add_number('warning', "Warning Length", 1, 60, 10)
@@ -158,6 +164,7 @@ function init()
   faderOptions = {0, 1, 3, 10}
   tt = {}
   tt.rpm = 33.3
+  tt.rps = 0.555
   tt.recordSize = 27
   tt.recordSpeed = 33.33
   tt.playRate = 0.
@@ -203,8 +210,9 @@ function init()
   position_poll = poll.set("get_position")
   position_poll.callback = function(val)
     waveform.position = val
+    tt.position = (tt.rps * waveform.lengthInS * val * 360) % 360
   end
-  position_poll.time = 1/10
+  position_poll.time = 1/60
   position_poll:start()
 	-- file loaded
 	loaded_poll = poll.set("file_loaded")
@@ -213,13 +221,6 @@ function init()
 	  waveform.isLoaded = val
 	end
 	loaded_poll:start()
-	
-	-- engine init
-	engine.prate(0)
-	engine.stiffness(1)
-	engine.skipto(0.0)
-	engine.overall(1)
-	engine.warble(0)
 
 end
 
@@ -274,7 +275,9 @@ function load_file(file)
     --get file info
     local ch, length, rate = audio.file_info(file)
     --calc length in seconds
-    waveform.lengthInS = length * ((rate / 48000) / rate)
+    if rate > 0 then
+      waveform.lengthInS = length * ((rate / 48000) / rate)
+    end
     print("sample length is "..waveform.lengthInS)
     print("sample rate is "..rate)
     print("file is"..file)
@@ -492,7 +495,6 @@ function redraw()
 --			drawWaveform()
 			drawUI()
 			screen.fill()
-			tt.position = tt.position + tt.playRate * ((tt.rpm/60)*360)/60
 		end
   end
 

@@ -24,9 +24,9 @@ Engine_turntable : CroneEngine {
     // add SynthDefs
 		SynthDef("turntable", {
 			arg t_trigger, prate, stiffness, skipto, overall,
-			noise_level, tnoise, tdust, trumble, tmotor, warble;
+			noise_level, tnoise, tdust, trumble, tmotor, warble, riaa, filter;
 
-			var playrate = LFNoise2.kr(1 + prate, prate * warble, prate);
+			var playrate = Lag3.kr(LFNoise2.kr(1 + prate, prate * warble, prate), stiffness);
 			// playhead
 			var playhead = Phasor.ar(
 				trig: t_trigger,
@@ -47,14 +47,16 @@ Engine_turntable : CroneEngine {
 			);
 	    	// noise stuff
 		    var dtrig = Dust.ar(5);
+	      var withfilter = BHiPass4.ar(MoogFF.ar(playback, 20000 - (filter * 15000)), 20 + (filter * 880));
 		    var v_noise = BBandPass.ar(PinkNoise.ar([tnoise,tnoise]), 10000, 5);
 		    var v_dust = Pan2.ar(BBandPass.ar(BBandPass.ar(Dust2.ar(10,2), TRand.ar(170, 3370, dtrig), 3), 5370,0.4) * EnvGen.ar(Env.perc(0.05, 0.05), dtrig), TRand.ar(-1, 1, dtrig), tdust);
 		    var v_rumble = BBandPass.ar(PinkNoise.ar([trumble,trumble]), [13.5,13.5], 1);
 		    var v_motor = BBandPass.ar(WhiteNoise.ar(), 100, 0.1, tmotor) + BBandPass.ar(WhiteNoise.ar(), 150, 0.1, tmotor * 0.5);
 		    var v_mix = (v_noise + v_dust + v_rumble + v_motor) * Clip.kr(playrate, -1,1);
-			var withnoise = (playback + v_mix) * overall;
+			var withnoise = (withfilter + v_mix) * overall;
+			var withriaa = BHiShelf.ar(BLowShelf.ar(withnoise, 165, 1.6, riaa * 19.35), 7500, 1.6, riaa * -22);
 
-			Out.ar(0, withnoise);
+			Out.ar(0, withriaa);
 			// bus output for poll
 			Out.kr(posBus.index, position_deci)
 		}).add;
@@ -72,7 +74,9 @@ Engine_turntable : CroneEngine {
   		\trumble, 0.9,
   		\tmotor, 0.5,
   		\overall, 1,
-  		\warble, 0
+  		\warble, 0,
+  		\riaa, 0,
+  		\filter, 0
   		;
   	]);
 		
