@@ -67,15 +67,15 @@ function init_params()
   params:add_number('drive', 'Turntable Drive', 1, 16, 4)
   params:add_number('noise', 'Turntable Noise', 0, 200, 0)
   params:set_action('noise', function(x) 
-    x = x/100
+    x = x/50
     engine.tnoise(0.07 * x)
     engine.trumble(5 * x)
     engine.tmotor(3 * x)
   end)
   params:add_number('dust', 'Turntable Dust', 0, 200, 0)
-  params:set_action('dust', function(x) engine.tdust(x/100) end)
+  params:set_action('dust', function(x) engine.tdust(x/50) end)
 params:add_number('warble', 'Turntable Warble', 0, 200, 0)
-  params:set_action('warble', function(x) engine.warble(x/100) end)
+  params:set_action('warble', function(x) engine.warble(x/400) end)
   params:add_binary('loop', 'Loop', 'toggle', 0)
   params:add_binary('warningOn', 'Warning Timer', 'toggle', 1)
   params:add_number('warning', "Warning Length", 1, 60, 10)
@@ -461,7 +461,7 @@ function drawUI()
     screen.text("load?")
     screen.fill()
   end
-  -- clock
+  --[[ clock
   clockCounter = clockCounter - 1
   if clockCounter < 1 then
     clockCounter = 60
@@ -470,15 +470,18 @@ function drawUI()
   end  
   screen.move(0,6)
   screen.text(osdate)
+  --]]
   --time elapsed / remaining
   if waveform.isLoaded then
     local remaining = util.s_to_hms(math.floor(((1 - waveform.position) * waveform.lengthInS)))
     remaining = remaining:sub(3,7)
     screen.text_rotate(128,26,"-"..remaining, 270)
   end
+  --[[
   screen.level(15)
   screen.move(20,60)
   screen.text(util.round(tt.playRate, 0.01))
+  --]]
 end
 
 function redraw()

@@ -1,10 +1,13 @@
 Engine_turntable : CroneEngine {
 
+    // global variables for some reason
 	  var params;
 	  var turntable;
 	  var tBuff;
+	  // needs a beak for some reason
 	  var <posBus;
     
+    // this for some reason
     *new { arg context, doneCallback;
         ^super.new(context, doneCallback);
     }
@@ -22,8 +25,8 @@ Engine_turntable : CroneEngine {
 		SynthDef("turntable", {
 			arg t_trigger, prate, stiffness, skipto, overall,
 			noise_level, tnoise, tdust, trumble, tmotor, warble;
-			
-			var playrate = Lag3.kr(prate + (LFNoise2.kr(prate * 4, warble)), stiffness);
+
+			var playrate = LFNoise2.kr(1 + prate, prate * warble, prate);
 			// playhead
 			var playhead = Phasor.ar(
 				trig: t_trigger,
