@@ -205,6 +205,9 @@ function init()
   
   pausedHand = 15
   
+  --softcut view setup
+  softcut.event_render(copy_samples)
+  
   -- polls
   -- file position
   position_poll = poll.set("get_position")
@@ -238,8 +241,8 @@ function stopper()
 end
 
 function copy_samples(ch, start, length, samples)
-        print("loading "..#samples.." samples")
-        waveform.samples = {}
+  print("loading "..#samples.." samples")
+  waveform.samples = {}
   for i = 1, #samples, 1 do
     waveform.samples[i] = samples[i]
   end
@@ -247,6 +250,7 @@ function copy_samples(ch, start, length, samples)
   screenDirty = true
   waveform.isLoaded = true
 end
+
 function setFader(x)
 	local y = 0
 	local y2 = 1
@@ -286,11 +290,10 @@ function load_file(file)
     tt.rateRate = rate / 48000
     --load file into buffer (file, start_source (s), start_destination (s), duration (s), preserve, mix)
     engine.fileload(file, length)
+    --load file into buffer (file, start_source (s), start_destination (s), duration (s), preserve, mix)
+    softcut.buffer_read_stereo(file, 0, 0, -1, 0, 1)
     --read samples into waveformSamples (number of samples)
-    ------ NEXT BIG TODO -----
-    ------ NEXT BIG TODO -----
-    ------ NEXT BIG TODO -----
-    ------ NEXT BIG TODO -----
+    redraw_sample(waveform.lengthInS, length)
     --update param
     params:set("file",file,0)
   end
@@ -455,6 +458,57 @@ function drawBackground()
 	end
 end
 
+function drawWaveform()
+  --warning flasher!!
+  if params:get('loop') == 0 and params:get('warningOn') == 1 and math.floor((((waveform.length - waveform.position * 1024)) / waveform.length) * (waveform.length / waveform.rate)) < params:get('warning') and clockCounter < 15 and playing then
+    screen.rect(80,0,48,64)
+    screen.fill()
+  end
+	--waveform
+	screen.aa(0)
+	--waveform proper
+	if waveform.isLoaded then
+  	local width = 24
+  	local x = 104
+    local offset = -16
+	  -- for each pixel row, from bottom up
+    for i=1, 64, 1 do
+      -- set the position we'll read a sample from
+    	local drawhead = math.floor(waveform.position * #waveform.samples) + i + offset
+    	if drawhead >= #waveform.samples then
+    	  if params:get('loop') == 1 then drawhead = drawhead - #waveform.samples
+    	  else drawhead = -1
+    	  end
+    	end
+    	if drawhead < 1 then
+      	if params:get('loop') == 1 then drawhead = drawhead + #waveform.samples 
+      	else drawhead = -1
+      	end
+    	end
+    	local sample = 0
+    	if drawhead == -1 then sample = 0 else sample = waveform.samples[drawhead] end
+    	if sample then
+    	  if playhead == 1 then sample = 1 end
+    	  screen.level(math.floor(1 + math.abs(sample) * 15))
+        screen.move(x + sample * width, 64-i)
+  	    screen.line(x - sample * width, 64-i)
+  	    screen.stroke()
+  	 end
+    end
+  	screen.level(3)
+	  for i=80, 128, 1 do
+	    if i % 8 == 0 then 
+	      screen.pixel(i + 4,47)
+	    end
+	  end
+	else
+	  screen.move(110,30)
+	  screen.text_center("K1+K3 to")
+	  screen.move(110,38)
+	  screen.text_center("load file")
+	end
+end
+
 function drawUI()
   screen.level(15)
   if heldKeys[1] then
@@ -492,7 +546,7 @@ function redraw()
   	if screenDirty or tt.playRate > 0.001 or tt.playRate < 0.001 then
 			screen.clear()
 			drawBackground()
---			drawWaveform()
+			drawWaveform()
 			drawUI()
 			screen.fill()
 		end
