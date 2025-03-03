@@ -25,6 +25,8 @@
 -- between the turntable and
 -- norns stereo inputs
 --
+-- see params for lots of
+-- fun things to play with
 
 engine.name = "turntable"
 util = require "util"
