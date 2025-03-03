@@ -55,8 +55,9 @@ Engine_turntable : CroneEngine {
 		    var v_mix = (v_noise + v_dust + v_rumble + v_motor) * Clip.kr(playrate, -1,1);
 			var withnoise = (withfilter + v_mix) * overall;
 			var withriaa = BHiShelf.ar(BLowShelf.ar(withnoise, 165, 1.6, riaa * 19.35), 7500, 1.6, riaa * -22);
+var antialias = LPF.ar(withriaa, Clip.kr(20000 * playrate, 20, 24000));
 
-			Out.ar(0, withriaa);
+			Out.ar(0, antialias);
 			// bus output for poll
 			Out.kr(posBus.index, position_deci)
 		}).add;
