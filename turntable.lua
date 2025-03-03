@@ -102,12 +102,10 @@ function init_params()
     if mode == 1 then 
         crow.input[1].mode("change", 1.0, 0.1, "both")
         crow.input[1].change = crow_playstop
-        crow.input[2].stream = crow_rate 
     end
     if mode == 2 then 
       crow.input[1].mode("stream", 0.1)
-      crow.input[1].stream = crow_rate
-      crow.input[2].stream = crow_pos 
+      crow.input[1].stream = crow_pos
     end
   end)
   
@@ -192,9 +190,10 @@ function init()
   heldKeys = {}
   
   --crow stuff
-  crowModes = { "play / rate", "play / position" }
+  crowModes = { "play / rate", "position / rate" }
   crowDestination = 0
   crow.input[2].mode("stream", 0.1)
+  crow.input[2].stream = crow_rate 
   
   init_params()
 
@@ -570,12 +569,20 @@ end
 function play_clock() ------ churning out updated playrates, and passing them to SC
   while true do
     clock.sleep(1/24)
-    tt.playRate = tt.rateRate * tt.pitch * tt.mismatch * tt.destinationRate + tt.nudgeRate
-    if tt.playRate < 0.01 and tt.playRate > -0.01 then 
-      tt.playRate = 0
+    if params:get('crowmode') == 1 then
+      tt.playRate = tt.rateRate * tt.pitch * tt.mismatch * tt.destinationRate + tt.nudgeRate + tt.crowRate
+      if tt.playRate < 0.01 and tt.playRate > -0.01 then 
+        tt.playRate = 0
+      end
+      --print("setting rate to "..tt.playRate)
+      engine.prate(tt.playRate)
+    else
+      --get time in seconds between here and there
+      local distance = (crowDestination - waveform.position) * waveform.lengthInS
+      local intime = util.clamp(tt.crowRate + 2.5, 0.01, 5)
+      tt.playRate = distance / intime
+      engine.prate(tt.playRate)
     end
-    --print("setting rate to "..tt.playRate)
-    engine.prate(tt.playRate)
     if params:get("loop") == 0 then
       stopper()
     end
@@ -613,6 +620,23 @@ function enc(e, d)
     end
   end
   screenDirty = true
+end
+
+function crow_playstop(v)
+  if v then 
+    playing = true 
+    tt.destinationRate = 1
+  else playing = false 
+    tt.destinationRate = 0
+  end
+end
+
+function crow_rate(v)
+  tt.crowRate = (v/2.5)
+end
+
+function crow_pos(v)
+  crowDestination = (v / 10 + 0.5)
 end
 
 function key(k, z)
