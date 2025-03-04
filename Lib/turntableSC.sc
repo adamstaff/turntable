@@ -26,7 +26,7 @@ Engine_turntable : CroneEngine {
 			arg t_trigger, prate, stiffness, skipto, overall,
 			noise_level, tnoise, tdust, trumble, tmotor, warble, riaa, filter;
 
-			var playrate = Lag3.kr(LFNoise2.kr(1 + prate, prate * warble, prate), stiffness);
+			var playrate = Lag3.kr(LFNoise2.kr(1 + abs(prate), abs(prate) * warble, prate), stiffness);
 			// playhead
 			var playhead = Phasor.ar(
 				trig: t_trigger,
@@ -45,15 +45,15 @@ Engine_turntable : CroneEngine {
 				phase: playhead,
 				interpolation: 4;
 			);
-	    	// noise stuff
-		    var dtrig = Dust.ar(5);
-		    var antialias = LPF.ar(playback, Clip.kr((20000 * pow(2, (abs(playrate) - 1) * 8)), 20, 24000));
-	      var withfilter = BHiPass4.ar(MoogFF.ar(antialias, 20000 - (filter * 15000)), 20 + (filter * 880));
-		    var v_noise = BBandPass.ar(PinkNoise.ar([tnoise,tnoise]), 10000, 5);
-		    var v_dust = Pan2.ar(BBandPass.ar(BBandPass.ar(Dust2.ar(10,2), TRand.ar(170, 3370, dtrig), 3), 5370,0.4) * EnvGen.ar(Env.perc(0.05, 0.05), dtrig), TRand.ar(-1, 1, dtrig), tdust);
-		    var v_rumble = BBandPass.ar(PinkNoise.ar([trumble,trumble]), [13.5,13.5], 1);
-		    var v_motor = BBandPass.ar(WhiteNoise.ar(), 100, 0.1, tmotor) + BBandPass.ar(WhiteNoise.ar(), 150, 0.1, tmotor * 0.5);
-		    var v_mix = (v_noise + v_dust + v_rumble + v_motor) * Clip.kr(playrate, -1,1);
+	    // noise stuff
+		  var dtrig = Dust.ar(5);
+		  var antialias = LPF.ar(playback, Lag3.kr(Clip.kr((20000 * pow(2, (abs(playrate) - 1) * 8)), 20, 24000), stiffness));
+      var withfilter = BHiPass4.ar(MoogFF.ar(antialias, 20000 - (filter * 15000)), 20 + (filter * 880));
+		  var v_noise = BBandPass.ar(PinkNoise.ar([tnoise,tnoise]), 10000, 5);
+		  var v_dust = Pan2.ar(BBandPass.ar(BBandPass.ar(Dust2.ar(10,2), TRand.ar(170, 3370, dtrig), 3), 5370,0.4) * EnvGen.ar(Env.perc(0.05, 0.05), dtrig), TRand.ar(-1, 1, dtrig), tdust);
+		  var v_rumble = BBandPass.ar(PinkNoise.ar([trumble,trumble]), [13.5,13.5], 1);
+		  var v_motor = BBandPass.ar(WhiteNoise.ar(), 100, 0.1, tmotor) + BBandPass.ar(WhiteNoise.ar(), 150, 0.1, tmotor * 0.5);
+		  var v_mix = (v_noise + v_dust + v_rumble + v_motor) * Clip.kr(playrate, -1,1);
 			var withnoise = (withfilter + v_mix) * overall;
 			var withriaa = BHiShelf.ar(BLowShelf.ar(withnoise, 165, 1.6, riaa * 19.35), 7500, 1.6, riaa * -22);
 

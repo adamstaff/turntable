@@ -1,5 +1,5 @@
 -- 
---         turntable v3.0
+--         turntable v3.0.1
 --         By Adam Staff
 --
 --
@@ -238,6 +238,7 @@ function stopper()
     engine.prate(0)
     engine.t_trigger(1)
     playing = false
+    engine.stiffness(4 - (params:get("stiffness")/4))
 	end
 end
 
